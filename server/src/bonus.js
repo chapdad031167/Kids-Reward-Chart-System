@@ -1,5 +1,6 @@
 import { db } from './db.js';
 import { todayStr } from './dates.js';
+import { vacationState } from './vacation.js';
 
 /**
  * Mystery bonus tasks ("Fog of War"): on pseudo-random days (~4 of 7,
@@ -28,6 +29,7 @@ export function isMysteryDay(kidId, date) {
  *   { revealed: true, task, status, completion_id } — opened
  */
 export function getBonusForToday(kidId) {
+  if (vacationState().on) return null; // no mysteries while on break
   const date = todayStr();
   if (!isMysteryDay(kidId, date)) return null;
 

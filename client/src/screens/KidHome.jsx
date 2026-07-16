@@ -184,9 +184,17 @@ export default function KidHome() {
         </div>
       )}
 
-      <ProgressMeter theme={theme} progress={data.progress} />
+      {data.vacation && (
+        <div className="panel vacation-panel">
+          <div className="vacation-icon">{theme.icons.mascot}💤</div>
+          <h2>{theme.terms.vacationTitle}</h2>
+          <p>{theme.terms.vacationBody}</p>
+        </div>
+      )}
 
-      {data.bonus && !data.bonus.revealed && (
+      {!data.vacation && <ProgressMeter theme={theme} progress={data.progress} />}
+
+      {!data.vacation && data.bonus && !data.bonus.revealed && (
         <button
           className={`mystery-card${revealing ? ' revealing' : ''}`}
           onClick={onRevealMystery}
@@ -199,7 +207,7 @@ export default function KidHome() {
           <span className="mystery-q">❓</span>
         </button>
       )}
-      {data.bonus?.revealed && (
+      {!data.vacation && data.bonus?.revealed && (
         <TaskCard
           task={{ ...data.bonus.task, status: data.bonus.status, streak: 0 }}
           theme={theme}
@@ -237,7 +245,7 @@ export default function KidHome() {
         )}
       </div>
 
-      {grouped.map(({ cat, tasks }) => (
+      {!data.vacation && grouped.map(({ cat, tasks }) => (
         <section key={cat.id}>
           <div className="category-header">
             <span>{cat.icon}</span>

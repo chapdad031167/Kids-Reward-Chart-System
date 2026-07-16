@@ -42,6 +42,14 @@ the pool in the Tasks tab: any task with the ✨ *Mystery bonus task* checkbox i
 the daily list and enters the mystery rotation. The day schedule and task pick are
 deterministic per (kid, date), so restarts and multiple devices always agree.
 
+**Vacation mode**: the 🏖️ toggle in the parent dashboard pauses the whole household for
+travel or school breaks. Kids see a friendly themed "on break" screen instead of their task
+list (points and the reward shop stay available), no completions or mystery challenges
+happen, and — the important part — **streaks freeze**: days inside a vacation stretch never
+count as missed, so a 20-day streak from before the trip resumes at 20 the day you turn the
+toggle off. Vacation stretches are remembered permanently, so streak math stays correct
+forever after.
+
 **Sounds**: every sound is synthesized in the browser with the Web Audio API — no audio
 files, works offline. Task celebrations play a themed jingle (ref's whistle + fanfare for
 soccer, egg-crack + friendly roar for dino), mystery reveals shimmer, reward requests ding,
@@ -144,7 +152,4 @@ Dockerfile         multi-stage build: Vite build → static files served by Expr
 
 ## Backlog
 
-- **Holiday / Vacation Mode** — a parent toggle for stretches when daily routines aren't
-  practical (travel, school breaks): pause the daily task list and freeze streaks so they
-  resume where they left off instead of breaking.
 - **Multi-household or external/cloud accounts** — the app stays LAN-only.

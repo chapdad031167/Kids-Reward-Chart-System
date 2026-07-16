@@ -4,6 +4,7 @@ import { todayStr, nowIso } from '../dates.js';
 import { expireStalePending, displayStreak, transferPoints } from '../service.js';
 import { notifyParent } from '../notify.js';
 import { getBonusForToday, revealBonus } from '../bonus.js';
+import { vacationState } from '../vacation.js';
 
 export const kiosk = Router();
 
@@ -77,6 +78,7 @@ kiosk.get('/kids/:id/today', (req, res) => {
     tasks,
     categories,
     bonus,
+    vacation: vacationState().on,
     progress: {
       doneCount,
       totalTasks: tasks.length,
@@ -92,6 +94,7 @@ kiosk.get('/kids/:id/today', (req, res) => {
  * the kiosk offline queue can retry safely.
  */
 kiosk.post('/completions', (req, res) => {
+  if (vacationState().on) return res.status(400).json({ error: 'vacation_mode' });
   const { task_id, kid_id, client_id } = req.body || {};
   const task = db.prepare(`SELECT * FROM tasks WHERE id = ? AND active = 1`).get(task_id);
   const kid = db.prepare(`SELECT id FROM kids WHERE id = ?`).get(kid_id);

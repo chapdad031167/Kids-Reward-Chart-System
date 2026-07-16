@@ -12,6 +12,13 @@ export function prevDay(dateStr) {
   return d.toISOString().slice(0, 10);
 }
 
+/** The day after a YYYY-MM-DD date string. */
+export function nextDay(dateStr) {
+  const d = new Date(dateStr + 'T12:00:00Z');
+  d.setUTCDate(d.getUTCDate() + 1);
+  return d.toISOString().slice(0, 10);
+}
+
 export function nowIso() {
   return new Date().toISOString();
 }

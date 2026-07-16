@@ -97,15 +97,41 @@ function PinScreen({ onVerified }) {
 function Dashboard({ pin, onLock }) {
   const [tab, setTab] = useState('pending');
   const [toast, setToast] = useState(null);
+  const [vacation, setVacation] = useState(null); // {on, since}
+  const [confirmingVacation, setConfirmingVacation] = useState(false);
   const navigate = useNavigate();
   const client = parentApi(pin);
 
   const notify = (msg) => setToast(msg);
 
+  useEffect(() => {
+    client.get('/api/parent/vacation').then(setVacation).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function toggleVacation(on) {
+    try {
+      const state = await client.post('/api/parent/vacation', { on });
+      setVacation(state);
+      notify(on ? 'Vacation mode is ON — tasks paused, streaks frozen' : 'Welcome back! Routines resume today');
+    } catch {
+      notify('Could not update vacation mode');
+    }
+    setConfirmingVacation(false);
+  }
+
   return (
     <div className="parent-shell">
       <div className="parent-topbar">
         <h1>👨‍👧‍👦 Parent Dashboard</h1>
+        {vacation && (
+          <button
+            className={`btn ${vacation.on ? 'accent' : 'secondary'}`}
+            onClick={() => (vacation.on ? toggleVacation(false) : setConfirmingVacation(true))}
+          >
+            🏖️ Vacation: {vacation.on ? 'ON' : 'OFF'}
+          </button>
+        )}
         <button className="btn secondary" onClick={() => navigate('/')}>
           Kiosk
         </button>
@@ -113,6 +139,30 @@ function Dashboard({ pin, onLock }) {
           🔒 Lock
         </button>
       </div>
+      {vacation?.on && (
+        <div className="vacation-banner">
+          🏖️ Vacation mode since {vacation.since} — kid task lists are paused and streaks are
+          frozen. Turn it off the morning routines resume.
+        </div>
+      )}
+      {confirmingVacation && (
+        <Modal title="🏖️ Turn on Vacation Mode?" onClose={() => setConfirmingVacation(false)}>
+          <p style={{ fontSize: 15, lineHeight: 1.5 }}>
+            While vacation mode is on: the kids' task lists are <strong>paused</strong> (no
+            tapping, no mystery challenges), and <strong>streaks freeze</strong> — the days away
+            won't count as missed, so every streak picks up right where it left off when you
+            turn this off. Points and the reward shop stay available.
+          </p>
+          <div className="modal-actions">
+            <button className="btn secondary" onClick={() => setConfirmingVacation(false)}>
+              Cancel
+            </button>
+            <button className="btn primary" onClick={() => toggleVacation(true)}>
+              Start vacation 🏖️
+            </button>
+          </div>
+        </Modal>
+      )}
       <div className="parent-tabs">
         {[
           ['pending', '⏳ Pending'],

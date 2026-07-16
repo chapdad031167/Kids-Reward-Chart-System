@@ -1,5 +1,6 @@
 import { db, balances } from './db.js';
 import { todayStr, prevDay, nowIso } from './dates.js';
+import { prevActiveDay } from './vacation.js';
 
 /**
  * Lazy daily housekeeping: pending completions from prior days expire.
@@ -13,13 +14,14 @@ export function expireStalePending() {
 }
 
 /**
- * The streak a kid should currently see for a task. A stored streak whose
- * last approved day is before yesterday is broken — display 0.
+ * The streak a kid should currently see for a task. A streak is alive if
+ * its last approved day is today or the most recent non-vacation day —
+ * vacation days never count as "missed".
  */
 export function displayStreak(streakRow) {
   if (!streakRow || !streakRow.last_completed_date) return 0;
   const today = todayStr();
-  if (streakRow.last_completed_date === today || streakRow.last_completed_date === prevDay(today)) {
+  if (streakRow.last_completed_date === today || streakRow.last_completed_date >= prevActiveDay(today)) {
     return streakRow.current_streak;
   }
   return 0;
@@ -80,10 +82,15 @@ function approveCompletionInner(completionId) {
     db.prepare(`SELECT * FROM streaks WHERE task_id = ? AND kid_id = ?`).get(task.id, kid.id) || null;
 
   let current = 1;
-  if (prevStreak && prevStreak.last_completed_date === prevDay(completion.date)) {
-    current = prevStreak.current_streak + 1;
-  } else if (prevStreak && prevStreak.last_completed_date === completion.date) {
+  if (prevStreak && prevStreak.last_completed_date === completion.date) {
     current = prevStreak.current_streak;
+  } else if (
+    prevStreak &&
+    prevStreak.last_completed_date &&
+    prevStreak.last_completed_date >= prevActiveDay(completion.date)
+  ) {
+    // Chain continues across any run of vacation days in between.
+    current = prevStreak.current_streak + 1;
   }
   const longest = Math.max(current, prevStreak ? prevStreak.longest_streak : 0);
 
@@ -235,7 +242,7 @@ export function recomputeStreak(taskId, kidId) {
   let longest = 0;
   let prev = null;
   for (const { date } of rows) {
-    chain = prev !== null && prevDay(date) === prev ? chain + 1 : 1;
+    chain = prev !== null && prev >= prevActiveDay(date) ? chain + 1 : 1;
     if (chain > longest) longest = chain;
     prev = date;
   }

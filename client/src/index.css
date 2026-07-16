@@ -589,6 +589,38 @@ button {
   padding: 2px 9px;
 }
 
+/* ---------- Vacation mode ---------- */
+
+.vacation-panel {
+  text-align: center;
+  padding: 28px 20px;
+}
+
+.vacation-panel .vacation-icon {
+  font-size: 56px;
+  margin-bottom: 6px;
+}
+
+.vacation-panel h2 {
+  font-size: 24px;
+}
+
+.vacation-panel p {
+  font-size: 16px;
+  line-height: 1.5;
+  margin: 6px auto 0;
+  max-width: 420px;
+}
+
+.vacation-banner {
+  background: #fde68a;
+  color: #7c5200;
+  font-weight: 700;
+  font-size: 14px;
+  padding: 10px 18px;
+  text-align: center;
+}
+
 /* ---------- Mystery bonus ---------- */
 
 .mystery-card {

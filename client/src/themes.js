@@ -30,6 +30,8 @@ export const THEMES = {
       mysteryTitle: 'Mystery Challenge!',
       mysteryTap: 'Tap to open the golden trophy box!',
       bonus: 'BONUS',
+      vacationTitle: 'Off-Season Break! 🏖️',
+      vacationBody: 'No matches today — enjoy your break! Your Win Streaks are frozen safe and will be waiting when you get back.',
     },
     icons: {
       mascot: '⚽',
@@ -68,6 +70,8 @@ export const THEMES = {
       mysteryTitle: 'Mystery Egg!',
       mysteryTap: 'Tap to crack it open!',
       bonus: 'BONUS',
+      vacationTitle: 'Dino Vacation! 🏝️',
+      vacationBody: 'The dinos are taking a nap — no tasks today! Your Fossil Streaks are frozen safe until you’re back.',
     },
     icons: {
       mascot: '🦖',

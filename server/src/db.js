@@ -103,6 +103,15 @@ CREATE TABLE IF NOT EXISTS bonus_assignments (
   PRIMARY KEY (kid_id, date)
 );
 
+CREATE TABLE IF NOT EXISTS settings (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS vacation_days (
+  date TEXT PRIMARY KEY
+);
+
 CREATE TABLE IF NOT EXISTS parent_actions (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   type TEXT NOT NULL,

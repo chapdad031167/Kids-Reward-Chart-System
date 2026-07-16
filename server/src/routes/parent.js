@@ -13,6 +13,7 @@ import {
   resetKidDay,
   adjustBalance,
 } from '../service.js';
+import { vacationState, setVacation } from '../vacation.js';
 
 const PARENT_PIN = process.env.PARENT_PIN || '1234';
 
@@ -88,6 +89,16 @@ parent.post('/undo', (req, res) => {
   const result = undoLastAction();
   if (!result.ok) return res.status(400).json({ error: result.reason });
   res.json(result);
+});
+
+// ---- Vacation mode ----
+
+parent.get('/vacation', (req, res) => {
+  res.json(vacationState());
+});
+
+parent.post('/vacation', (req, res) => {
+  res.json(setVacation(!!req.body?.on));
 });
 
 // ---- Category management ----
