@@ -237,6 +237,41 @@ export default function KidHome() {
             Move points into my {theme.terms.savings}
           </button>
         )}
+        {data.goal && (
+          <div className={`goal-panel${data.goal.reached ? ' reached' : ''}`}>
+            <span className="goal-icon">{data.goal.reward.icon}</span>
+            <span className="goal-body">
+              <div className="goal-title">
+                ⭐ {theme.terms.goalTitle}: {data.goal.reward.title}
+              </div>
+              {data.goal.reached ? (
+                <div className="goal-reached-text">{theme.terms.goalReached}</div>
+              ) : (
+                <>
+                  <div className="meter-track goal-track">
+                    <div
+                      className="meter-fill"
+                      style={{ width: `${Math.max(6, Math.round((data.goal.saved / data.goal.reward.cost) * 100))}%` }}
+                    />
+                  </div>
+                  <div className="goal-caption">
+                    {data.goal.saved} of {data.goal.reward.cost} points saved — {data.goal.needed} to go!
+                  </div>
+                </>
+              )}
+            </span>
+            <button
+              className="goal-clear"
+              aria-label="Remove goal"
+              onClick={async () => {
+                await api.post(`/api/kids/${kidId}/goal`, { reward_id: null }).catch(() => {});
+                refresh();
+              }}
+            >
+              ✕
+            </button>
+          </div>
+        )}
         {data.pendingRedemptions.length > 0 && (
           <div style={{ marginTop: 10, fontWeight: 700, fontSize: 14 }}>
             ⏳ Waiting for a grown-up:{' '}
@@ -355,6 +390,17 @@ function RewardsModal({ kidId, theme, onClose }) {
     }
   }
 
+  async function setGoal(reward) {
+    try {
+      await api.post(`/api/kids/${kidId}/goal`, { reward_id: reward.id });
+      playSound('ding');
+      setToast(`⭐ Goal set: ${reward.title}!`);
+    } catch {
+      setToast('Couldn’t set the goal — try again.');
+    }
+    setConfirming(null);
+  }
+
   return (
     <Modal title={`🎁 ${theme.terms.rewards}`} onClose={onClose}>
       {!catalog ? (
@@ -362,18 +408,13 @@ function RewardsModal({ kidId, theme, onClose }) {
       ) : (
         <div className="reward-grid">
           {catalog.rewards.map((r) => (
-            <button
-              key={r.id}
-              className="reward-card"
-              disabled={!r.affordable}
-              onClick={() => setConfirming(r)}
-            >
+            <button key={r.id} className="reward-card" onClick={() => setConfirming(r)}>
               <span className="reward-icon">{r.icon}</span>
               <span className="reward-title">{r.title}</span>
               <span className="reward-cost">
                 {r.cost} pts · {r.bucket_required === 'savings' ? theme.terms.savings : theme.terms.checking}
               </span>
-              {!r.affordable && <span className="reward-locked">Keep earning!</span>}
+              {!r.affordable && <span className="reward-locked">⭐ Tap to make it your goal!</span>}
             </button>
           ))}
         </div>
@@ -383,7 +424,7 @@ function RewardsModal({ kidId, theme, onClose }) {
           Close
         </button>
       </div>
-      {confirming && (
+      {confirming && confirming.affordable && (
         <Modal title="Are you sure?" onClose={() => setConfirming(null)}>
           <p style={{ fontSize: 16 }}>
             Trade <strong>{confirming.cost} points</strong> for{' '}
@@ -398,6 +439,25 @@ function RewardsModal({ kidId, theme, onClose }) {
             </button>
             <button className="btn primary" onClick={() => requestReward(confirming)}>
               Yes! 🎉
+            </button>
+          </div>
+        </Modal>
+      )}
+      {confirming && !confirming.affordable && (
+        <Modal title="Save up for this?" onClose={() => setConfirming(null)}>
+          <p style={{ fontSize: 16 }}>
+            <strong>
+              {confirming.icon} {confirming.title}
+            </strong>{' '}
+            costs <strong>{confirming.cost} points</strong>. Make it your goal and watch your
+            progress bar fill up as you earn!
+          </p>
+          <div className="modal-actions">
+            <button className="btn secondary" onClick={() => setConfirming(null)}>
+              Not now
+            </button>
+            <button className="btn primary" onClick={() => setGoal(confirming)}>
+              ⭐ Make it my goal!
             </button>
           </div>
         </Modal>

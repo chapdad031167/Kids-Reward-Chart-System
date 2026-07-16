@@ -184,6 +184,15 @@ if (!taskColumns.includes('days')) {
   db.exec(`ALTER TABLE tasks ADD COLUMN days TEXT`);
 }
 
+// Savings goals + reward fulfillment (v1.2).
+if (!kidColumns.includes('goal_reward_id')) {
+  db.exec(`ALTER TABLE kids ADD COLUMN goal_reward_id INTEGER REFERENCES rewards_catalog(id)`);
+}
+const redemptionColumns = db.prepare(`PRAGMA table_info(redemptions)`).all().map((c) => c.name);
+if (!redemptionColumns.includes('fulfilled_at')) {
+  db.exec(`ALTER TABLE redemptions ADD COLUMN fulfilled_at TEXT`);
+}
+
 /** Current point balances per bucket for a kid. */
 export function balances(kidId) {
   const rows = db

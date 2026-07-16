@@ -42,6 +42,15 @@ the pool in the Tasks tab: any task with the ✨ *Mystery bonus task* checkbox i
 the daily list and enters the mystery rotation. The day schedule and task pick are
 deterministic per (kid, date), so restarts and multiple devices always agree.
 
+**Savings goals**: in the reward shop, a reward a kid can't afford yet shows "tap to make it
+your goal" — picking it puts a themed goal panel (⭐ My Trophy Goal / My Dino Dream) on their
+home screen with a progress bar toward the cost, and it celebrates when they can afford it.
+
+**Reward follow-through**: approved redemptions land in a "To deliver" list in the parent
+pending queue until you tap ✓ Delivered — so "pick dinner" never gets approved and then
+forgotten. **Bonus awards** (Kids & Vaults → 🎁) grant points to one or both kids for
+off-chart moments, with a note that shows in history; each kid's vault split rules apply.
+
 **Task scheduling**: every task can be limited to specific days of the week (day chips in
 the task form — e.g. "Pack backpack" on school nights only, trash duty on Tuesdays). Kids
 only see tasks scheduled for today, and streaks count only expected days: a weekdays-only

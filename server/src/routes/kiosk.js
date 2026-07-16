@@ -58,6 +58,23 @@ kiosk.get('/kids/:id/today', (req, res) => {
     .reduce((sum, t) => sum + t.point_value, 0);
   if (bonus?.revealed && bonus.status === 'approved') earnedToday += bonus.task.point_value;
 
+  // Savings goal: the reward this kid is saving toward, with progress.
+  let goal = null;
+  if (kid.goal_reward_id) {
+    const reward = db
+      .prepare(`SELECT id, title, cost, bucket_required, icon FROM rewards_catalog WHERE id = ? AND active = 1`)
+      .get(kid.goal_reward_id);
+    if (reward) {
+      const bal = balances(kid.id)[reward.bucket_required];
+      goal = {
+        reward,
+        saved: Math.min(bal, reward.cost),
+        needed: Math.max(0, reward.cost - bal),
+        reached: bal >= reward.cost,
+      };
+    }
+  }
+
   const pendingRedemptions = db
     .prepare(
       `SELECT r.id, r.cost_paid, rc.title, rc.icon
@@ -80,6 +97,7 @@ kiosk.get('/kids/:id/today', (req, res) => {
     tasks,
     categories,
     bonus,
+    goal,
     vacation: vacationState().on,
     progress: {
       doneCount,
@@ -192,6 +210,23 @@ kiosk.post('/redemptions', (req, res) => {
     .run(kid_id, reward_id, reward.cost, nowIso());
   notifyParent('Reward request', `${kid.name} wants: ${reward.title} (${reward.cost} pts)`, 'gift');
   res.status(201).json(db.prepare(`SELECT * FROM redemptions WHERE id = ?`).get(info.lastInsertRowid));
+});
+
+/** Kid picks (or clears) the reward they're saving toward. */
+kiosk.post('/kids/:id/goal', (req, res) => {
+  const kid = db.prepare(`SELECT * FROM kids WHERE id = ?`).get(req.params.id);
+  if (!kid) return res.status(404).json({ error: 'kid_not_found' });
+  const rewardId = req.body?.reward_id ?? null;
+  if (rewardId !== null) {
+    const reward = db
+      .prepare(`SELECT * FROM rewards_catalog WHERE id = ? AND active = 1`)
+      .get(rewardId);
+    if (!reward || (reward.kid_id !== null && reward.kid_id !== kid.id)) {
+      return res.status(400).json({ error: 'invalid_reward' });
+    }
+  }
+  db.prepare(`UPDATE kids SET goal_reward_id = ? WHERE id = ?`).run(rewardId, kid.id);
+  res.json({ ok: true });
 });
 
 /** Kid opens today's mystery — reveals the bonus task. */

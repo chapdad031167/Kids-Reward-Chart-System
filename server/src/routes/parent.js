@@ -12,6 +12,7 @@ import {
   transferPoints,
   resetKidDay,
   adjustBalance,
+  awardPoints,
 } from '../service.js';
 import { vacationState, setVacation } from '../vacation.js';
 import { listBackups, runBackup } from '../backup.js';
@@ -55,7 +56,38 @@ parent.get('/pending', (req, res) => {
        ORDER BY r.redeemed_at`
     )
     .all();
-  res.json({ completions, redemptions });
+  // Approved but not yet delivered — the follow-through list.
+  const toDeliver = db
+    .prepare(
+      `SELECT r.id, r.cost_paid, r.reviewed_at, k.name AS kid_name, k.id AS kid_id,
+              rc.title, rc.icon
+       FROM redemptions r
+       JOIN kids k ON k.id = r.kid_id
+       JOIN rewards_catalog rc ON rc.id = r.reward_id
+       WHERE r.status = 'approved' AND r.fulfilled_at IS NULL
+       ORDER BY r.reviewed_at`
+    )
+    .all();
+  res.json({ completions, redemptions, toDeliver });
+});
+
+/** Mark an approved reward as actually delivered to the kid. */
+parent.post('/redemptions/:id/fulfill', (req, res) => {
+  const info = db
+    .prepare(
+      `UPDATE redemptions SET fulfilled_at = ? WHERE id = ? AND status = 'approved' AND fulfilled_at IS NULL`
+    )
+    .run(new Date().toISOString(), req.params.id);
+  if (info.changes === 0) return res.status(400).json({ error: 'not_deliverable' });
+  res.json({ ok: true });
+});
+
+/** Bonus award: points to one or more kids outside the task system. */
+parent.post('/award', (req, res) => {
+  const { kid_ids, amount, note } = req.body || {};
+  const result = awardPoints(kid_ids, Number(amount), note);
+  if (!result.ok) return res.status(400).json({ error: result.reason });
+  res.json({ ok: true });
 });
 
 parent.post('/completions/:id/approve', (req, res) => {

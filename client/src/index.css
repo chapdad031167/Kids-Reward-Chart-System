@@ -614,6 +614,70 @@ button {
   padding: 2px 9px;
 }
 
+/* ---------- Savings goal ---------- */
+
+.goal-panel {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: var(--chip);
+  border: 2px dashed var(--accent);
+}
+
+.goal-panel.reached {
+  border-style: solid;
+  background: #d9f5e1;
+  animation: mystery-glow 2.2s ease-in-out infinite;
+}
+
+.goal-icon {
+  font-size: 38px;
+}
+
+.goal-body {
+  flex: 1;
+}
+
+.goal-title {
+  font-weight: 800;
+  font-size: 15px;
+  margin-bottom: 6px;
+}
+
+.goal-track {
+  height: 18px;
+  border-radius: 9px;
+}
+
+.goal-track .meter-fill {
+  border-radius: 9px;
+}
+
+.goal-caption {
+  font-size: 13px;
+  font-weight: 700;
+  margin-top: 4px;
+  opacity: 0.85;
+}
+
+.goal-reached-text {
+  font-size: 15px;
+  font-weight: 800;
+  color: #1f6b40;
+}
+
+.goal-clear {
+  min-width: 44px;
+  min-height: 44px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.07);
+  font-size: 16px;
+  font-weight: 700;
+}
+
 /* ---------- Vacation mode ---------- */
 
 .vacation-panel {

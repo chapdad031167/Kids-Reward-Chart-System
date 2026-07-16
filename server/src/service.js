@@ -302,6 +302,25 @@ export const adjustBalance = db.transaction((kidId, bucket, amount) => {
   return { ok: true };
 });
 
+/**
+ * Parent bonus award: credit points to one or more kids outside the task
+ * system ("helped unload the camping gear"). Follows each kid's vault
+ * rules (manual → checking, auto-split → split).
+ */
+export const awardPoints = db.transaction((kidIds, amount, note) => {
+  if (!Number.isInteger(amount) || amount <= 0) return { ok: false, reason: 'invalid_amount' };
+  if (!Array.isArray(kidIds) || kidIds.length === 0) return { ok: false, reason: 'no_kids' };
+  const source = `award:${(note || '').trim().slice(0, 80) || 'bonus'}`;
+  for (const kidId of kidIds) {
+    const kid = db.prepare(`SELECT * FROM kids WHERE id = ?`).get(kidId);
+    if (!kid) return { ok: false, reason: 'kid_not_found' };
+    const split = splitEarnings(kid, amount);
+    insertLedger(kid.id, split.checking, 'earn', 'checking', source);
+    insertLedger(kid.id, split.savings, 'earn', 'savings', source);
+  }
+  return { ok: true };
+});
+
 /** Kid-initiated (or parent-initiated) transfer between buckets. */
 export const transferPoints = db.transaction((kidId, from, to, amount) => {
   if (!['checking', 'savings'].includes(from) || !['checking', 'savings'].includes(to) || from === to) {

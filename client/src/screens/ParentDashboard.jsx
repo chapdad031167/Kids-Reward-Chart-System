@@ -252,7 +252,10 @@ function PendingTab({ client, notify }) {
   }
 
   if (!data) return 'Loading…';
-  const empty = data.completions.length === 0 && data.redemptions.length === 0;
+  const empty =
+    data.completions.length === 0 &&
+    data.redemptions.length === 0 &&
+    (data.toDeliver || []).length === 0;
 
   return (
     <div>
@@ -312,6 +315,24 @@ function PendingTab({ client, notify }) {
             onClick={() => act(`/api/parent/redemptions/${r.id}/reject`, `Rejected reward: ${r.title}`)}
           >
             ❌
+          </button>
+        </div>
+      ))}
+
+      {(data.toDeliver || []).length > 0 && <h3>🎁 To deliver (approved, not yet given)</h3>}
+      {(data.toDeliver || []).map((r) => (
+        <div key={`d${r.id}`} className="pending-item">
+          <span className="who">{r.kid_name}</span>
+          <span className="what">
+            {r.icon} {r.title}
+            <br />
+            <small>approved {new Date(r.reviewed_at).toLocaleDateString()}</small>
+          </span>
+          <button
+            className="btn primary"
+            onClick={() => act(`/api/parent/redemptions/${r.id}/fulfill`, `Delivered: ${r.title} 🎉`)}
+          >
+            ✓ Delivered
           </button>
         </div>
       ))}
@@ -717,6 +738,7 @@ function KidsTab({ client, notify }) {
   const [resetting, setResetting] = useState(null); // kid
   const [settingCode, setSettingCode] = useState(null); // kid
   const [backups, setBackups] = useState([]);
+  const [awarding, setAwarding] = useState(false);
 
   const load = useCallback(() => {
     client.get('/api/parent/kids').then(setKids).catch(() => notify('Failed to load kids'));
@@ -771,6 +793,22 @@ function KidsTab({ client, notify }) {
 
   return (
     <div>
+      <button className="btn primary" style={{ marginBottom: 14 }} onClick={() => setAwarding(true)}>
+        🎁 Bonus award
+      </button>
+
+      {awarding && (
+        <AwardModal
+          kids={kids}
+          client={client}
+          notify={notify}
+          onClose={() => {
+            setAwarding(false);
+            load();
+          }}
+        />
+      )}
+
       {kids.map((kid) => (
         <div key={kid.id} className="pending-item" style={{ alignItems: 'flex-start' }}>
           <span style={{ fontSize: 34 }}>{kid.avatar_icon}</span>
@@ -894,6 +932,77 @@ function KidsTab({ client, notify }) {
         </button>
       </div>
     </div>
+  );
+}
+
+function AwardModal({ kids, client, notify, onClose }) {
+  const [selected, setSelected] = useState(new Set(kids.map((k) => k.id)));
+  const [amount, setAmount] = useState('');
+  const [note, setNote] = useState('');
+  const parsed = Number(amount);
+  const valid = Number.isInteger(parsed) && parsed > 0 && selected.size > 0;
+
+  function toggle(id) {
+    const next = new Set(selected);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setSelected(next);
+  }
+
+  async function award() {
+    try {
+      await client.post('/api/parent/award', {
+        kid_ids: [...selected],
+        amount: parsed,
+        note,
+      });
+      notify(`Awarded +${parsed} to ${kids.filter((k) => selected.has(k.id)).map((k) => k.name).join(' & ')} 🎁`);
+      onClose();
+    } catch {
+      notify('Award failed — check the amount');
+    }
+  }
+
+  return (
+    <Modal title="🎁 Bonus award" onClose={onClose}>
+      <p style={{ fontSize: 14, color: '#4a5568' }}>
+        Points for something outside the chart ("helped unload the camping gear"). Each kid's
+        vault rules apply — auto-split kids split it, manual kids get it as spending.
+      </p>
+      <div className="form-grid">
+        <label>
+          Who gets it?
+          <span style={{ display: 'flex', gap: 10, marginTop: 4 }}>
+            {kids.map((k) => (
+              <button
+                type="button"
+                key={k.id}
+                className={`btn ${selected.has(k.id) ? 'primary' : 'secondary'}`}
+                onClick={() => toggle(k.id)}
+              >
+                {k.avatar_icon} {k.name}
+              </button>
+            ))}
+          </span>
+        </label>
+        <label>
+          Points
+          <input type="number" min="1" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="5" />
+        </label>
+        <label>
+          What for? (shows in history)
+          <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="helped with the camping gear" />
+        </label>
+      </div>
+      <div className="modal-actions">
+        <button className="btn secondary" onClick={onClose}>
+          Cancel
+        </button>
+        <button className="btn primary" disabled={!valid} onClick={award}>
+          Award {valid ? `+${parsed}` : ''} 🎁
+        </button>
+      </div>
+    </Modal>
   );
 }
 
