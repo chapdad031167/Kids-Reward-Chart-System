@@ -108,8 +108,20 @@ client/            React + Vite kiosk & dashboard
 Dockerfile         multi-stage build: Vite build → static files served by Express
 ```
 
-## Out of scope for V1 (backlog)
+## Backlog
 
-Push notifications (ntfy), mystery/random bonus tasks, multi-household/cloud accounts, and
-audio effects. Celebrations are visual-only by design so sound can be layered in later
-without rework.
+- **Keyboard entry on the parent PIN screen** — the PIN pad currently only accepts
+  taps/clicks; typing digits (and Enter/Backspace) should work too for desktop use.
+- **Manual reset from the parent dashboard** — a correction tool for when a mistake slips
+  past the single-level undo: e.g. reset a kid's day (clear today's completions) and/or
+  directly adjust a vault balance, with the change logged in the ledger.
+- **Holiday / Vacation Mode** — a parent toggle for stretches when daily routines aren't
+  practical (travel, school breaks): pause the daily task list and freeze streaks so they
+  resume where they left off instead of breaking.
+- **Push notifications via ntfy** — already running on the NAS for other services; notify a
+  parent's phone on new pending completions/redemptions. V1 keeps the approval flow
+  manual in-app by choice.
+- **"Fog of War" mystery/random bonus tasks.**
+- **Multi-household or external/cloud accounts** — the app stays LAN-only.
+- **Audio/sound effects** — celebrations are visual-only by design so sound can be layered
+  in later without rework (trigger point is marked in `Celebration.jsx`).
