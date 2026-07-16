@@ -16,9 +16,17 @@ points balances (Spending / Savings split), and a reward shop. Tapping a task ma
 of inactivity the kiosk returns to the avatar screen. Kids never see each other's progress.
 
 **Parent dashboard** (`/parent`, or long-press the logo on the avatar screen): protected by a
-4-digit PIN. Approve/reject completions and reward requests (with Quick Approve All), undo the
-last approval (restores points *and* streaks), manage tasks and rewards, configure each kid's
-vault, and view per-kid history.
+4-digit PIN (tap the pad or type on a keyboard). Approve/reject completions and reward
+requests (with Quick Approve All), undo the last approval (restores points *and* streaks),
+manage tasks and rewards, configure each kid's vault, and view per-kid history. Two
+correction tools live in Kids & Vaults for when a mistake slips past undo: **Adjust points**
+(directly add/remove from a vault, logged in the ledger) and **Reset today** (wipe a kid's
+day — clears today's completions, claws back today's points, and rewinds streaks as if the
+day hadn't been tapped).
+
+**Notifications (optional)**: set `NTFY_URL` to an ntfy topic URL and the app pushes a
+notification whenever a kid taps a task or requests a reward, so you can approve from your
+phone without watching the queue. Unset = disabled; a down ntfy server never blocks the app.
 
 **Points & vaults**: each kid has a `checking` (spending) and `savings` bucket.
 - *Manual mode* (Aedan): all earnings land in checking; the kid can move points into savings
@@ -72,6 +80,7 @@ the tablet's home screen in kiosk/fullscreen mode for the best experience.
 | `PARENT_PIN` | `1234`             | 4-digit PIN for the parent dashboard — change it |
 | `TZ`         | `America/New_York` | Local timezone for daily reset and streaks     |
 | `DATA_DIR`   | `/data`            | Where the SQLite file lives (mount a volume)   |
+| `NTFY_URL`   | *(unset)*          | ntfy topic URL for parent push notifications; unset disables |
 
 ### Persistence & backup
 
@@ -110,17 +119,9 @@ Dockerfile         multi-stage build: Vite build → static files served by Expr
 
 ## Backlog
 
-- **Keyboard entry on the parent PIN screen** — the PIN pad currently only accepts
-  taps/clicks; typing digits (and Enter/Backspace) should work too for desktop use.
-- **Manual reset from the parent dashboard** — a correction tool for when a mistake slips
-  past the single-level undo: e.g. reset a kid's day (clear today's completions) and/or
-  directly adjust a vault balance, with the change logged in the ledger.
 - **Holiday / Vacation Mode** — a parent toggle for stretches when daily routines aren't
   practical (travel, school breaks): pause the daily task list and freeze streaks so they
   resume where they left off instead of breaking.
-- **Push notifications via ntfy** — already running on the NAS for other services; notify a
-  parent's phone on new pending completions/redemptions. V1 keeps the approval flow
-  manual in-app by choice.
 - **"Fog of War" mystery/random bonus tasks.**
 - **Multi-household or external/cloud accounts** — the app stays LAN-only.
 - **Audio/sound effects** — celebrations are visual-only by design so sound can be layered

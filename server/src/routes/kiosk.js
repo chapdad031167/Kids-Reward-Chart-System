@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { db, balances } from '../db.js';
 import { todayStr, nowIso } from '../dates.js';
 import { expireStalePending, displayStreak, transferPoints } from '../service.js';
+import { notifyParent } from '../notify.js';
 
 export const kiosk = Router();
 
@@ -94,6 +95,12 @@ kiosk.post('/completions', (req, res) => {
       )
       .run(task_id, kid_id, today, nowIso(), client_id || null);
     const completion = db.prepare(`SELECT * FROM completions WHERE id = ?`).get(info.lastInsertRowid);
+    const kidName = db.prepare(`SELECT name FROM kids WHERE id = ?`).get(kid_id).name;
+    notifyParent(
+      'Task waiting for approval',
+      `${kidName}: ${task.title} (+${task.point_value})`,
+      'hourglass_flowing_sand'
+    );
     res.status(201).json({ completion, duplicate: false });
   } catch (err) {
     // A concurrent retry with the same client_id landed first — treat as success.
@@ -156,6 +163,7 @@ kiosk.post('/redemptions', (req, res) => {
        VALUES (?, ?, ?, ?, 'pending')`
     )
     .run(kid_id, reward_id, reward.cost, nowIso());
+  notifyParent('Reward request', `${kid.name} wants: ${reward.title} (${reward.cost} pts)`, 'gift');
   res.status(201).json(db.prepare(`SELECT * FROM redemptions WHERE id = ?`).get(info.lastInsertRowid));
 });
 

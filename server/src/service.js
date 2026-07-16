@@ -213,6 +213,83 @@ export const undoLastAction = db.transaction(() => {
   return { ok: true, type: action.type, count: payload.items.length };
 });
 
+/**
+ * Rebuild a task's streak row from its approved-completion history.
+ * Used after a manual reset deletes completions, where the undo-style
+ * snapshot approach can't apply.
+ */
+export function recomputeStreak(taskId, kidId) {
+  const rows = db
+    .prepare(
+      `SELECT date FROM completions
+       WHERE task_id = ? AND kid_id = ? AND status = 'approved' ORDER BY date`
+    )
+    .all(taskId, kidId);
+
+  if (rows.length === 0) {
+    db.prepare(`DELETE FROM streaks WHERE task_id = ? AND kid_id = ?`).run(taskId, kidId);
+    return;
+  }
+
+  let chain = 0;
+  let longest = 0;
+  let prev = null;
+  for (const { date } of rows) {
+    chain = prev !== null && prevDay(date) === prev ? chain + 1 : 1;
+    if (chain > longest) longest = chain;
+    prev = date;
+  }
+
+  db.prepare(
+    `INSERT INTO streaks (task_id, kid_id, current_streak, longest_streak, last_completed_date)
+     VALUES (?, ?, ?, ?, ?)
+     ON CONFLICT (task_id, kid_id) DO UPDATE SET
+       current_streak = excluded.current_streak,
+       longest_streak = excluded.longest_streak,
+       last_completed_date = excluded.last_completed_date`
+  ).run(taskId, kidId, chain, longest, prev);
+}
+
+/**
+ * Wipe one kid's day: delete today's completions (any status), claw back
+ * the points they earned, and rebuild affected streaks from history.
+ * Clears the undo stack, since undo snapshots may reference deleted rows.
+ */
+export const resetKidDay = db.transaction((kidId) => {
+  const today = todayStr();
+  const completions = db
+    .prepare(`SELECT * FROM completions WHERE kid_id = ? AND date = ?`)
+    .all(kidId, today);
+
+  const deleteLedger = db.prepare(`DELETE FROM points_ledger WHERE kid_id = ? AND source = ?`);
+  const deleteCompletion = db.prepare(`DELETE FROM completions WHERE id = ?`);
+  for (const c of completions) {
+    deleteLedger.run(kidId, `completion:${c.id}`);
+    deleteCompletion.run(c.id);
+  }
+
+  for (const taskId of new Set(completions.map((c) => c.task_id))) {
+    recomputeStreak(taskId, kidId);
+  }
+
+  db.prepare(`UPDATE parent_actions SET undone = 1 WHERE undone = 0`).run();
+  return completions.length;
+});
+
+/**
+ * Direct parent correction of a vault balance. Positive adds, negative
+ * removes (never below zero). Logged in the ledger as 'adjustment'.
+ */
+export const adjustBalance = db.transaction((kidId, bucket, amount) => {
+  if (!['checking', 'savings'].includes(bucket)) return { ok: false, reason: 'invalid_bucket' };
+  if (!Number.isInteger(amount) || amount === 0) return { ok: false, reason: 'invalid_amount' };
+  if (amount < 0 && balances(kidId)[bucket] < -amount) {
+    return { ok: false, reason: 'insufficient_points' };
+  }
+  insertLedger(kidId, Math.abs(amount), amount > 0 ? 'earn' : 'spend', bucket, 'adjustment');
+  return { ok: true };
+});
+
 /** Kid-initiated (or parent-initiated) transfer between buckets. */
 export const transferPoints = db.transaction((kidId, from, to, amount) => {
   if (!['checking', 'savings'].includes(from) || !['checking', 'savings'].includes(to) || from === to) {

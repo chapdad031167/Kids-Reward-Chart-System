@@ -10,6 +10,8 @@ import {
   approveAllToday,
   undoLastAction,
   transferPoints,
+  resetKidDay,
+  adjustBalance,
 } from '../service.js';
 
 const PARENT_PIN = process.env.PARENT_PIN || '1234';
@@ -212,6 +214,23 @@ parent.post('/kids/:id/transfer', (req, res) => {
   const result = transferPoints(Number(req.params.id), from, to, Number(amount));
   if (!result.ok) return res.status(400).json({ error: result.reason });
   res.json({ ok: true, balances: balances(Number(req.params.id)) });
+});
+
+/** Wipe a kid's day: today's completions, their points, and streak effects. */
+parent.post('/kids/:id/reset-day', (req, res) => {
+  const kid = db.prepare(`SELECT id FROM kids WHERE id = ?`).get(req.params.id);
+  if (!kid) return res.status(404).json({ error: 'kid_not_found' });
+  const cleared = resetKidDay(kid.id);
+  res.json({ ok: true, cleared, balances: balances(kid.id) });
+});
+
+/** Directly correct a vault balance (positive adds, negative removes). */
+parent.post('/kids/:id/adjust', (req, res) => {
+  const kid = db.prepare(`SELECT id FROM kids WHERE id = ?`).get(req.params.id);
+  if (!kid) return res.status(404).json({ error: 'kid_not_found' });
+  const result = adjustBalance(kid.id, req.body?.bucket, Number(req.body?.amount));
+  if (!result.ok) return res.status(400).json({ error: result.reason });
+  res.json({ ok: true, balances: balances(kid.id) });
 });
 
 // ---- History ----

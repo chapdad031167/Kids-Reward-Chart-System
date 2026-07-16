@@ -40,6 +40,19 @@ function PinScreen({ onVerified }) {
     setEntered((prev) => (prev.length >= 4 ? prev : prev + digit));
   }
 
+  // Physical keyboard works too: digits type, Backspace/Delete erase.
+  useEffect(() => {
+    const onKey = (e) => {
+      if (/^[0-9]$/.test(e.key)) press(e.key);
+      else if (e.key === 'Backspace' || e.key === 'Delete') {
+        setError('');
+        setEntered((prev) => prev.slice(0, -1));
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
   useEffect(() => {
     if (entered.length !== 4) return;
     let alive = true;
@@ -505,6 +518,8 @@ function RewardForm({ reward, kids, onSave, onClose }) {
 function KidsTab({ client, notify }) {
   const [kids, setKids] = useState(null);
   const [history, setHistory] = useState(null); // { kid, data }
+  const [adjusting, setAdjusting] = useState(null); // kid
+  const [resetting, setResetting] = useState(null); // kid
 
   const load = useCallback(() => {
     client.get('/api/parent/kids').then(setKids).catch(() => notify('Failed to load kids'));
@@ -526,6 +541,32 @@ function KidsTab({ client, notify }) {
   async function showHistory(kid) {
     const data = await client.get(`/api/parent/kids/${kid.id}/history`).catch(() => null);
     if (data) setHistory({ kid, data });
+  }
+
+  async function adjust(kid, bucket, amount) {
+    try {
+      await client.post(`/api/parent/kids/${kid.id}/adjust`, { bucket, amount });
+      notify(`${kid.name}: ${amount > 0 ? '+' : ''}${amount} ${bucket}`);
+      setAdjusting(null);
+      load();
+    } catch (err) {
+      notify(
+        err.message === 'insufficient_points'
+          ? 'Not enough points in that vault to remove'
+          : 'Adjustment failed — check the amount'
+      );
+    }
+  }
+
+  async function resetDay(kid) {
+    try {
+      const result = await client.post(`/api/parent/kids/${kid.id}/reset-day`);
+      notify(`Cleared ${result.cleared} of today's completions for ${kid.name}`);
+    } catch {
+      notify('Reset failed');
+    }
+    setResetting(null);
+    load();
   }
 
   if (!kids) return 'Loading…';
@@ -572,14 +613,95 @@ function KidsTab({ client, notify }) {
               )}
             </div>
           </span>
-          <button className="btn secondary" onClick={() => showHistory(kid)}>
-            📜 History
-          </button>
+          <span style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <button className="btn secondary" onClick={() => showHistory(kid)}>
+              📜 History
+            </button>
+            <button className="btn secondary" onClick={() => setAdjusting(kid)}>
+              ⚖️ Adjust points
+            </button>
+            <button className="btn danger" onClick={() => setResetting(kid)}>
+              🧹 Reset today
+            </button>
+          </span>
         </div>
       ))}
 
+      {adjusting && (
+        <AdjustModal kid={adjusting} onSave={adjust} onClose={() => setAdjusting(null)} />
+      )}
+
+      {resetting && (
+        <Modal title={`Reset ${resetting.name}'s day?`} onClose={() => setResetting(null)}>
+          <p style={{ fontSize: 15, lineHeight: 1.5 }}>
+            This clears <strong>all of {resetting.name}'s completions from today</strong> — pending
+            and approved — takes back any points they earned today, and rewinds streaks as if
+            today hadn't been tapped yet. It also clears the undo history. Use this to fix a day
+            that went wrong (accidental taps, wrong kid selected).
+          </p>
+          <div className="modal-actions">
+            <button className="btn secondary" onClick={() => setResetting(null)}>
+              Cancel
+            </button>
+            <button className="btn danger" style={{ flex: 1 }} onClick={() => resetDay(resetting)}>
+              Yes, reset today
+            </button>
+          </div>
+        </Modal>
+      )}
+
       {history && (
-        <Modal title={`${history.kid.name}'s history`} onClose={() => setHistory(null)}>
+        <HistoryModal history={history} onClose={() => setHistory(null)} />
+      )}
+    </div>
+  );
+}
+
+function AdjustModal({ kid, onSave, onClose }) {
+  const [bucket, setBucket] = useState('checking');
+  const [amount, setAmount] = useState('');
+  const parsed = Number(amount);
+  const valid = Number.isInteger(parsed) && parsed !== 0;
+
+  return (
+    <Modal title={`Adjust ${kid.name}'s points`} onClose={onClose}>
+      <p style={{ fontSize: 14, color: '#4a5568' }}>
+        Current: 💰 {kid.balances.checking} checking · 🏦 {kid.balances.savings} savings.
+        Positive adds points, negative removes them. Shows in history as an adjustment.
+      </p>
+      <div className="form-grid">
+        <label>
+          Vault
+          <select value={bucket} onChange={(e) => setBucket(e.target.value)}>
+            <option value="checking">Checking (spending)</option>
+            <option value="savings">Savings</option>
+          </select>
+        </label>
+        <label>
+          Amount (e.g. 5 or -3)
+          <input
+            type="number"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            placeholder="0"
+          />
+        </label>
+      </div>
+      <div className="modal-actions">
+        <button className="btn secondary" onClick={onClose}>
+          Cancel
+        </button>
+        <button className="btn primary" disabled={!valid} onClick={() => onSave(kid, bucket, parsed)}>
+          Apply
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
+function HistoryModal({ history, onClose }) {
+  return (
+    <Modal title={`${history.kid.name}'s history`} onClose={onClose}>
           <div className="history-list">
             {history.data.completions.length === 0 && <p>No activity yet.</p>}
             {history.data.completions.map((c) => (
@@ -602,13 +724,11 @@ function KidsTab({ client, notify }) {
               </div>
             ))}
           </div>
-          <div className="modal-actions">
-            <button className="btn secondary" onClick={() => setHistory(null)}>
-              Close
-            </button>
-          </div>
-        </Modal>
-      )}
-    </div>
+      <div className="modal-actions">
+        <button className="btn secondary" onClick={onClose}>
+          Close
+        </button>
+      </div>
+    </Modal>
   );
 }
