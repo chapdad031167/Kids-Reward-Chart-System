@@ -1,0 +1,10 @@
+**/node_modules
+client/dist
+server/public
+data
+*.db
+*.db-shm
+*.db-wal
+.git
+README.md
+docker-compose.yml

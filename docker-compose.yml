@@ -1,0 +1,16 @@
+services:
+  reward-chart:
+    build: .
+    image: reward-chart:latest
+    container_name: reward-chart
+    restart: unless-stopped
+    ports:
+      - "8090:8090"
+    environment:
+      # Local timezone — daily reset and streaks key off this.
+      - TZ=America/New_York
+      # 4-digit PIN for the parent dashboard. CHANGE THIS.
+      - PARENT_PIN=1234
+    volumes:
+      # SQLite lives here — survives container rebuilds. Back up this folder.
+      - ./data:/data
