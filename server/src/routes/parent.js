@@ -90,20 +90,53 @@ parent.post('/undo', (req, res) => {
   res.json(result);
 });
 
+// ---- Category management ----
+
+parent.get('/categories', (req, res) => {
+  res.json(db.prepare(`SELECT * FROM categories ORDER BY position, id`).all());
+});
+
+function validCategoryBody(body) {
+  return body && typeof body.label === 'string' && body.label.trim().length > 0;
+}
+
+parent.post('/categories', (req, res) => {
+  if (!validCategoryBody(req.body)) return res.status(400).json({ error: 'invalid_category' });
+  const position = (db.prepare(`SELECT MAX(position) AS p FROM categories`).get().p || 0) + 1;
+  const info = db
+    .prepare(`INSERT INTO categories (label, icon, position) VALUES (?, ?, ?)`)
+    .run(req.body.label.trim(), req.body.icon || '📋', position);
+  res.status(201).json(db.prepare(`SELECT * FROM categories WHERE id = ?`).get(info.lastInsertRowid));
+});
+
+parent.patch('/categories/:id', (req, res) => {
+  const category = db.prepare(`SELECT * FROM categories WHERE id = ?`).get(req.params.id);
+  if (!category) return res.status(404).json({ error: 'category_not_found' });
+  const merged = {
+    label: req.body.label ?? category.label,
+    icon: req.body.icon ?? category.icon,
+  };
+  if (!validCategoryBody(merged)) return res.status(400).json({ error: 'invalid_category' });
+  db.prepare(`UPDATE categories SET label = ?, icon = ? WHERE id = ?`).run(
+    merged.label.trim(),
+    merged.icon,
+    category.id
+  );
+  res.json(db.prepare(`SELECT * FROM categories WHERE id = ?`).get(category.id));
+});
+
 // ---- Task management ----
 
 parent.get('/tasks', (req, res) => {
-  res.json(db.prepare(`SELECT * FROM tasks ORDER BY active DESC, category, id`).all());
+  res.json(db.prepare(`SELECT * FROM tasks ORDER BY active DESC, category_id, id`).all());
 });
-
-const TASK_CATEGORIES = ['morning', 'evening', 'personal_space', 'chores', 'social_school'];
 
 function validTaskBody(body) {
   return (
     body &&
     typeof body.title === 'string' &&
     body.title.trim().length > 0 &&
-    TASK_CATEGORIES.includes(body.category) &&
+    db.prepare(`SELECT id FROM categories WHERE id = ?`).get(body.category_id) !== undefined &&
     Number.isInteger(body.point_value) &&
     body.point_value > 0
   );
@@ -111,13 +144,13 @@ function validTaskBody(body) {
 
 parent.post('/tasks', (req, res) => {
   if (!validTaskBody(req.body)) return res.status(400).json({ error: 'invalid_task' });
-  const { title, category, point_value, icon, kid_id, is_bonus } = req.body;
+  const { title, category_id, point_value, icon, kid_id, is_bonus } = req.body;
   const info = db
     .prepare(
-      `INSERT INTO tasks (title, category, point_value, icon, active, kid_id, is_bonus)
+      `INSERT INTO tasks (title, category_id, point_value, icon, active, kid_id, is_bonus)
        VALUES (?, ?, ?, ?, 1, ?, ?)`
     )
-    .run(title.trim(), category, point_value, icon || '⭐', kid_id || null, is_bonus ? 1 : 0);
+    .run(title.trim(), category_id, point_value, icon || '⭐', kid_id || null, is_bonus ? 1 : 0);
   res.status(201).json(db.prepare(`SELECT * FROM tasks WHERE id = ?`).get(info.lastInsertRowid));
 });
 
@@ -126,7 +159,7 @@ parent.patch('/tasks/:id', (req, res) => {
   if (!task) return res.status(404).json({ error: 'task_not_found' });
   const merged = {
     title: req.body.title ?? task.title,
-    category: req.body.category ?? task.category,
+    category_id: req.body.category_id ?? task.category_id,
     point_value: req.body.point_value ?? task.point_value,
     icon: req.body.icon ?? task.icon,
     active: req.body.active !== undefined ? (req.body.active ? 1 : 0) : task.active,
@@ -135,8 +168,8 @@ parent.patch('/tasks/:id', (req, res) => {
   };
   if (!validTaskBody(merged)) return res.status(400).json({ error: 'invalid_task' });
   db.prepare(
-    `UPDATE tasks SET title = ?, category = ?, point_value = ?, icon = ?, active = ?, kid_id = ?, is_bonus = ? WHERE id = ?`
-  ).run(merged.title.trim(), merged.category, merged.point_value, merged.icon, merged.active, merged.kid_id, merged.is_bonus, task.id);
+    `UPDATE tasks SET title = ?, category_id = ?, point_value = ?, icon = ?, active = ?, kid_id = ?, is_bonus = ? WHERE id = ?`
+  ).run(merged.title.trim(), merged.category_id, merged.point_value, merged.icon, merged.active, merged.kid_id, merged.is_bonus, task.id);
   res.json(db.prepare(`SELECT * FROM tasks WHERE id = ?`).get(task.id));
 });
 
@@ -202,9 +235,18 @@ parent.patch('/kids/:id', (req, res) => {
   if (!['manual', 'auto_split'].includes(vault_mode) || typeof ratio !== 'number' || ratio <= 0 || ratio >= 1) {
     return res.status(400).json({ error: 'invalid_vault_config' });
   }
-  db.prepare(`UPDATE kids SET vault_mode = ?, auto_split_ratio = ? WHERE id = ?`).run(
+  // secret_code: emoji string enables the kid lock; null/'' disables it.
+  let secret_code = kid.secret_code;
+  if (req.body.secret_code !== undefined) {
+    const code = req.body.secret_code;
+    if (code === null || code === '') secret_code = null;
+    else if (typeof code === 'string' && code.length <= 24) secret_code = code;
+    else return res.status(400).json({ error: 'invalid_secret_code' });
+  }
+  db.prepare(`UPDATE kids SET vault_mode = ?, auto_split_ratio = ?, secret_code = ? WHERE id = ?`).run(
     vault_mode,
     ratio,
+    secret_code,
     kid.id
   );
   res.json(db.prepare(`SELECT * FROM kids WHERE id = ?`).get(kid.id));

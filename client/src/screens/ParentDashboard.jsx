@@ -2,14 +2,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api, parentApi } from '../api.js';
 import { Modal, Toast } from '../components/ui.jsx';
-
-const CATEGORIES = [
-  ['morning', 'Morning'],
-  ['evening', 'Evening'],
-  ['personal_space', 'Personal Space'],
-  ['chores', 'Household'],
-  ['social_school', 'Social & School'],
-];
+import EmojiPicker from '../components/EmojiPicker.jsx';
+import { CodePicker, CODE_LENGTH, CODE_EMOJIS } from '../components/KidCode.jsx';
 
 export default function ParentDashboard() {
   const [pin, setPin] = useState(() => sessionStorage.getItem('parent-pin') || null);
@@ -242,23 +236,29 @@ function PendingTab({ client, notify }) {
 
 // ---------- Task management ----------
 
-const EMPTY_TASK = { title: '', category: 'morning', point_value: 1, icon: '⭐', kid_id: null, is_bonus: 0 };
-
 function TasksTab({ client, notify }) {
   const [tasks, setTasks] = useState(null);
   const [kids, setKids] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [editing, setEditing] = useState(null);
+  const [managingCategories, setManagingCategories] = useState(false);
 
   const load = useCallback(() => {
     client.get('/api/parent/tasks').then(setTasks).catch(() => notify('Failed to load tasks'));
     client.get('/api/parent/kids').then(setKids).catch(() => {});
+    client.get('/api/parent/categories').then(setCategories).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(load, [load]);
 
   async function save(form) {
-    const body = { ...form, point_value: Number(form.point_value), kid_id: form.kid_id ? Number(form.kid_id) : null };
+    const body = {
+      ...form,
+      point_value: Number(form.point_value),
+      category_id: Number(form.category_id),
+      kid_id: form.kid_id ? Number(form.kid_id) : null,
+    };
     try {
       if (form.id) await client.patch(`/api/parent/tasks/${form.id}`, body);
       else await client.post('/api/parent/tasks', body);
@@ -279,9 +279,17 @@ function TasksTab({ client, notify }) {
 
   return (
     <div>
-      <button className="btn primary" style={{ marginBottom: 14 }} onClick={() => setEditing({ ...EMPTY_TASK })}>
-        ➕ Add Task
-      </button>
+      <div style={{ display: 'flex', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
+        <button
+          className="btn primary"
+          onClick={() => setEditing({ title: '', category_id: categories[0]?.id ?? 1, point_value: 1, icon: '⭐', kid_id: null, is_bonus: 0 })}
+        >
+          ➕ Add Task
+        </button>
+        <button className="btn secondary" onClick={() => setManagingCategories(true)}>
+          🏷️ Manage Categories
+        </button>
+      </div>
       <div style={{ overflowX: 'auto' }}>
         <table className="mgmt-table">
           <thead>
@@ -300,7 +308,7 @@ function TasksTab({ client, notify }) {
                 <td>
                   {t.is_bonus ? '✨ ' : ''}{t.icon} {t.title}
                 </td>
-                <td>{CATEGORIES.find(([k]) => k === t.category)?.[1]}</td>
+                <td>{categories.find((c) => c.id === t.category_id)?.label || '—'}</td>
                 <td>{t.point_value}</td>
                 <td>{t.kid_id ? kids.find((k) => k.id === t.kid_id)?.name || t.kid_id : 'Both'}</td>
                 <td>
@@ -319,13 +327,97 @@ function TasksTab({ client, notify }) {
         </table>
       </div>
       {editing && (
-        <TaskForm task={editing} kids={kids} onSave={save} onClose={() => setEditing(null)} />
+        <TaskForm task={editing} kids={kids} categories={categories} onSave={save} onClose={() => setEditing(null)} />
+      )}
+      {managingCategories && (
+        <CategoryManager
+          client={client}
+          notify={notify}
+          onClose={() => {
+            setManagingCategories(false);
+            load();
+          }}
+        />
       )}
     </div>
   );
 }
 
-function TaskForm({ task, kids, onSave, onClose }) {
+function CategoryManager({ client, notify, onClose }) {
+  const [categories, setCategories] = useState(null);
+  const [newLabel, setNewLabel] = useState('');
+  const [newIcon, setNewIcon] = useState('📋');
+
+  const load = useCallback(() => {
+    client.get('/api/parent/categories').then(setCategories).catch(() => notify('Failed to load categories'));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(load, [load]);
+
+  async function saveRow(cat) {
+    try {
+      await client.patch(`/api/parent/categories/${cat.id}`, { label: cat.label, icon: cat.icon });
+      notify(`Saved "${cat.label}"`);
+    } catch {
+      notify('Could not save — the name can’t be empty');
+    }
+    load();
+  }
+
+  async function add() {
+    try {
+      await client.post('/api/parent/categories', { label: newLabel, icon: newIcon });
+      notify(`Added "${newLabel}"`);
+      setNewLabel('');
+      setNewIcon('📋');
+      load();
+    } catch {
+      notify('Could not add — give it a name first');
+    }
+  }
+
+  return (
+    <Modal title="🏷️ Task Categories" onClose={onClose}>
+      <p style={{ fontSize: 14, color: '#4a5568' }}>
+        Rename a category or change its icon — the kids' screens update right away. Categories
+        with tasks can't be deleted, but you can move their tasks elsewhere and stop using them.
+      </p>
+      {!categories
+        ? 'Loading…'
+        : categories.map((cat, i) => (
+            <div key={cat.id} className="category-row">
+              <EmojiPicker
+                value={cat.icon}
+                onChange={(icon) => setCategories(categories.map((c, j) => (j === i ? { ...c, icon } : c)))}
+              />
+              <input
+                value={cat.label}
+                onChange={(e) => setCategories(categories.map((c, j) => (j === i ? { ...c, label: e.target.value } : c)))}
+              />
+              <button className="btn secondary" onClick={() => saveRow(cat)}>
+                Save
+              </button>
+            </div>
+          ))}
+      <h4 style={{ marginBottom: 8 }}>Add a category</h4>
+      <div className="category-row">
+        <EmojiPicker value={newIcon} onChange={setNewIcon} />
+        <input placeholder="e.g. Weekend Jobs" value={newLabel} onChange={(e) => setNewLabel(e.target.value)} />
+        <button className="btn primary" onClick={add}>
+          Add
+        </button>
+      </div>
+      <div className="modal-actions">
+        <button className="btn secondary" onClick={onClose}>
+          Done
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
+function TaskForm({ task, kids, categories, onSave, onClose }) {
   const [form, setForm] = useState(task);
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
 
@@ -338,10 +430,10 @@ function TaskForm({ task, kids, onSave, onClose }) {
         </label>
         <label>
           Category
-          <select value={form.category} onChange={set('category')}>
-            {CATEGORIES.map(([k, label]) => (
-              <option key={k} value={k}>
-                {label}
+          <select value={form.category_id} onChange={set('category_id')}>
+            {categories.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.icon} {c.label}
               </option>
             ))}
           </select>
@@ -351,8 +443,8 @@ function TaskForm({ task, kids, onSave, onClose }) {
           <input type="number" min="1" max="10" value={form.point_value} onChange={set('point_value')} />
         </label>
         <label>
-          Icon (emoji)
-          <input value={form.icon} onChange={set('icon')} />
+          Icon
+          <EmojiPicker value={form.icon} onChange={(icon) => setForm({ ...form, icon })} />
         </label>
         <label>
           Applies to
@@ -496,8 +588,8 @@ function RewardForm({ reward, kids, onSave, onClose }) {
           </select>
         </label>
         <label>
-          Icon (emoji)
-          <input value={form.icon} onChange={set('icon')} />
+          Icon
+          <EmojiPicker value={form.icon} onChange={(icon) => setForm({ ...form, icon })} />
         </label>
         <label>
           Available to
@@ -530,6 +622,7 @@ function KidsTab({ client, notify }) {
   const [history, setHistory] = useState(null); // { kid, data }
   const [adjusting, setAdjusting] = useState(null); // kid
   const [resetting, setResetting] = useState(null); // kid
+  const [settingCode, setSettingCode] = useState(null); // kid
 
   const load = useCallback(() => {
     client.get('/api/parent/kids').then(setKids).catch(() => notify('Failed to load kids'));
@@ -630,6 +723,9 @@ function KidsTab({ client, notify }) {
             <button className="btn secondary" onClick={() => setAdjusting(kid)}>
               ⚖️ Adjust points
             </button>
+            <button className="btn secondary" onClick={() => setSettingCode(kid)}>
+              🔒 Secret code{kid.secret_code ? `: ${kid.secret_code}` : ': none'}
+            </button>
             <button className="btn danger" onClick={() => setResetting(kid)}>
               🧹 Reset today
             </button>
@@ -639,6 +735,18 @@ function KidsTab({ client, notify }) {
 
       {adjusting && (
         <AdjustModal kid={adjusting} onSave={adjust} onClose={() => setAdjusting(null)} />
+      )}
+
+      {settingCode && (
+        <SecretCodeModal
+          kid={settingCode}
+          client={client}
+          notify={notify}
+          onClose={() => {
+            setSettingCode(null);
+            load();
+          }}
+        />
       )}
 
       {resetting && (
@@ -664,6 +772,58 @@ function KidsTab({ client, notify }) {
         <HistoryModal history={history} onClose={() => setHistory(null)} />
       )}
     </div>
+  );
+}
+
+function countCodeEmojis(str) {
+  let rest = str || '';
+  let n = 0;
+  while (rest.length > 0) {
+    const match = CODE_EMOJIS.find((e) => rest.startsWith(e));
+    if (!match) break;
+    n++;
+    rest = rest.slice(match.length);
+  }
+  return n;
+}
+
+function SecretCodeModal({ kid, client, notify, onClose }) {
+  const [code, setCode] = useState('');
+  const pickedCount = countCodeEmojis(code);
+
+  async function save(newCode) {
+    try {
+      await client.patch(`/api/parent/kids/${kid.id}`, { secret_code: newCode });
+      notify(newCode ? `${kid.name}'s secret code is set` : `${kid.name}'s code removed`);
+      onClose();
+    } catch {
+      notify('Could not save the code');
+    }
+  }
+
+  return (
+    <Modal title={`🔒 ${kid.name}'s secret code`} onClose={onClose}>
+      <p style={{ fontSize: 14, color: '#4a5568' }}>
+        {kid.secret_code
+          ? `Current code: ${kid.secret_code}. Pick 3 emoji below to change it.`
+          : `No code yet — ${kid.name}'s screen opens with one tap. Pick 3 emoji in order to lock it.`}{' '}
+        The kid taps the same 3, in the same order, to open their screen.
+      </p>
+      <CodePicker value={code} onChange={setCode} />
+      <div className="modal-actions">
+        {kid.secret_code && (
+          <button className="btn danger" onClick={() => save(null)}>
+            Remove code
+          </button>
+        )}
+        <button className="btn secondary" onClick={onClose}>
+          Cancel
+        </button>
+        <button className="btn primary" disabled={pickedCount < CODE_LENGTH} onClick={() => save(code)}>
+          Save code
+        </button>
+      </div>
+    </Modal>
   );
 }
 

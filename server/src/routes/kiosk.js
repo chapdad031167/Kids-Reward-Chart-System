@@ -8,8 +8,18 @@ import { getBonusForToday, revealBonus } from '../bonus.js';
 export const kiosk = Router();
 
 kiosk.get('/kids', (req, res) => {
-  const kids = db.prepare(`SELECT id, name, avatar_icon, theme, age FROM kids ORDER BY id`).all();
+  const kids = db
+    .prepare(`SELECT id, name, avatar_icon, theme, age, secret_code FROM kids ORDER BY id`)
+    .all()
+    .map(({ secret_code, ...kid }) => ({ ...kid, has_code: !!secret_code }));
   res.json(kids);
+});
+
+/** Kid enters their secret emoji code. Kids with no code always pass. */
+kiosk.post('/kids/:id/verify-code', (req, res) => {
+  const kid = db.prepare(`SELECT secret_code FROM kids WHERE id = ?`).get(req.params.id);
+  if (!kid) return res.status(404).json({ error: 'kid_not_found' });
+  res.json({ ok: !kid.secret_code || (req.body?.code ?? '') === kid.secret_code });
 });
 
 /** Everything the kid home screen needs in one call. */
@@ -22,14 +32,16 @@ kiosk.get('/kids/:id/today', (req, res) => {
 
   const tasks = db
     .prepare(
-      `SELECT t.id, t.title, t.category, t.point_value, t.icon,
+      `SELECT t.id, t.title, t.category_id, t.point_value, t.icon,
               c.id AS completion_id, c.status
        FROM tasks t
        LEFT JOIN completions c ON c.task_id = t.id AND c.kid_id = ? AND c.date = ?
        WHERE t.active = 1 AND t.is_bonus = 0 AND (t.kid_id IS NULL OR t.kid_id = ?)
-       ORDER BY t.category, t.id`
+       ORDER BY t.category_id, t.id`
     )
     .all(kid.id, today, kid.id);
+
+  const categories = db.prepare(`SELECT * FROM categories ORDER BY position, id`).all();
 
   const streakRows = db.prepare(`SELECT * FROM streaks WHERE kid_id = ?`).all(kid.id);
   const streaksByTask = new Map(streakRows.map((s) => [s.task_id, s]));
@@ -59,9 +71,11 @@ kiosk.get('/kids/:id/today', (req, res) => {
       avatar_icon: kid.avatar_icon,
       theme: kid.theme,
       vault_mode: kid.vault_mode,
+      has_code: !!kid.secret_code,
     },
     balances: balances(kid.id),
     tasks,
+    categories,
     bonus,
     progress: {
       doneCount,

@@ -80,10 +80,5 @@ export const THEMES = {
   },
 };
 
-export const CATEGORY_LABELS = {
-  morning: { label: 'Morning', icon: '🌅' },
-  evening: { label: 'Evening', icon: '🌙' },
-  personal_space: { label: 'My Space', icon: '🧹' },
-  chores: { label: 'Family Jobs', icon: '🏠' },
-  social_school: { label: 'School & Feelings', icon: '🧠' },
-};
+// Task categories now live in the database (parent-editable) and arrive
+// with each /today payload — no hardcoded list here anymore.

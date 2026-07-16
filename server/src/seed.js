@@ -58,15 +58,17 @@ export function ensureBonusPool() {
   const count = db.prepare(`SELECT COUNT(*) AS n FROM tasks WHERE is_bonus = 1`).get().n;
   if (count > 0) return false;
   const insert = db.prepare(
-    `INSERT INTO tasks (title, category, point_value, icon, active, kid_id, is_bonus)
+    `INSERT INTO tasks (title, category_id, point_value, icon, active, kid_id, is_bonus)
      VALUES (?, ?, ?, ?, 1, NULL, 1)`
   );
   const run = db.transaction(() => {
-    for (const t of SEED_BONUS_TASKS) insert.run(t.title, t.category, t.points, t.icon);
+    for (const t of SEED_BONUS_TASKS) insert.run(t.title, CATEGORY_IDS[t.category], t.points, t.icon);
   });
   run();
   return true;
 }
+
+const CATEGORY_IDS = { morning: 1, evening: 2, personal_space: 3, chores: 4, social_school: 5 };
 
 export function seedIfEmpty() {
   const kidCount = db.prepare('SELECT COUNT(*) AS n FROM kids').get().n;
@@ -81,10 +83,10 @@ export function seedIfEmpty() {
     insertKid.run('Ashton', '🦖', 'dino', 6, 'auto_split', 0.7);
 
     const insertTask = db.prepare(
-      `INSERT INTO tasks (title, category, point_value, icon, active, kid_id)
+      `INSERT INTO tasks (title, category_id, point_value, icon, active, kid_id)
        VALUES (?, ?, ?, ?, 1, NULL)`
     );
-    for (const t of SEED_TASKS) insertTask.run(t.title, t.category, t.points, t.icon);
+    for (const t of SEED_TASKS) insertTask.run(t.title, CATEGORY_IDS[t.category], t.points, t.icon);
 
     const insertReward = db.prepare(
       `INSERT INTO rewards_catalog (kid_id, title, cost, bucket_required, icon, active)

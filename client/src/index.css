@@ -99,6 +99,210 @@ button {
   border-radius: 12px;
 }
 
+.parents-btn {
+  background: rgba(255, 255, 255, 0.14);
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  color: #fff;
+  font-size: 16px;
+  font-weight: 700;
+  padding: 12px 26px;
+  min-height: 56px;
+  border-radius: 16px;
+}
+
+.parents-btn:active {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.avatar-lock {
+  font-size: 20px;
+  opacity: 0.9;
+}
+
+/* ---------- Kid secret code gate ---------- */
+
+.code-gate {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  background: linear-gradient(160deg, #16324a 0%, #1e4d6b 60%, #16324a 100%);
+  color: #fff;
+  padding: 24px;
+}
+
+.code-gate-avatar {
+  font-size: 72px;
+}
+
+.code-gate h2 {
+  margin: 0;
+  font-size: 24px;
+  text-align: center;
+}
+
+.code-dots {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+}
+
+.code-dot {
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  border: 3px dashed rgba(255, 255, 255, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 30px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.code-dot.filled {
+  border-style: solid;
+  border-color: #f5c518;
+  background: rgba(245, 197, 24, 0.18);
+}
+
+.code-dots.small .code-dot {
+  width: 44px;
+  height: 44px;
+  font-size: 24px;
+  border-color: #a0aec0;
+  background: #f7fafc;
+}
+
+.code-dots.small .code-dot.filled {
+  border-color: #2e9e56;
+  background: #e6f7ec;
+}
+
+.code-dots.shake {
+  animation: code-shake 0.5s ease-in-out;
+}
+
+@keyframes code-shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-12px); }
+  40% { transform: translateX(10px); }
+  60% { transform: translateX(-8px); }
+  80% { transform: translateX(6px); }
+}
+
+.code-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 88px);
+  gap: 14px;
+}
+
+.code-key {
+  width: 88px;
+  height: 88px;
+  border-radius: 22px;
+  font-size: 42px;
+  background: rgba(255, 255, 255, 0.12);
+  transition: transform 0.1s ease;
+}
+
+.code-key:active {
+  transform: scale(0.92);
+  background: rgba(255, 255, 255, 0.28);
+}
+
+.code-grid.small {
+  grid-template-columns: repeat(3, 64px);
+  gap: 10px;
+}
+
+.code-key.small {
+  width: 64px;
+  height: 64px;
+  font-size: 30px;
+  background: #edf2f7;
+  border-radius: 16px;
+}
+
+/* ---------- Emoji picker ---------- */
+
+.emoji-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.emoji-current {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  border: 1px solid #cbd5e0;
+  border-radius: 10px;
+  background: #fff;
+  align-self: flex-start;
+  min-height: 52px;
+}
+
+.emoji-current-icon {
+  font-size: 28px;
+}
+
+.emoji-current-hint {
+  font-size: 14px;
+  font-weight: 700;
+  color: #4a5568;
+}
+
+.emoji-grid {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 4px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 8px;
+  background: #f7fafc;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.emoji-cell {
+  font-size: 24px;
+  padding: 6px;
+  min-height: 44px;
+  border-radius: 8px;
+  background: transparent;
+}
+
+.emoji-cell:hover,
+.emoji-cell:active {
+  background: #e2e8f0;
+}
+
+.emoji-cell.selected {
+  background: #c6f6d5;
+}
+
+/* ---------- Category manager ---------- */
+
+.category-row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+
+.category-row input {
+  flex: 1;
+  font-size: 16px;
+  padding: 12px;
+  border: 1px solid #cbd5e0;
+  border-radius: 10px;
+  font-family: inherit;
+  min-width: 120px;
+}
+
 /* ---------- Kid home ---------- */
 
 .kid-home {

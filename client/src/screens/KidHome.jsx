@@ -1,13 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api, tapTask, queuedTapCount, startQueueSync } from '../api.js';
-import { THEMES, CATEGORY_LABELS } from '../themes.js';
+import { THEMES } from '../themes.js';
 import { useIdleTimer } from '../hooks.js';
 import Celebration from '../components/Celebration.jsx';
 import ProgressMeter from '../components/ProgressMeter.jsx';
 import { Modal, Toast } from '../components/ui.jsx';
-
-const CATEGORY_ORDER = ['morning', 'evening', 'personal_space', 'chores', 'social_school'];
 
 export default function KidHome() {
   const { kidId } = useParams();
@@ -44,6 +42,14 @@ export default function KidHome() {
       stopSync();
     };
   }, [refresh]);
+
+  // Kid-lock guard: a kid with a secret code must come through the
+  // avatar-screen gate, which stamps this session flag.
+  useEffect(() => {
+    if (data?.kid.has_code && sessionStorage.getItem(`kid-unlocked-${data.kid.id}`) !== '1') {
+      navigate('/');
+    }
+  }, [data, navigate]);
 
   if (!data) return <div className="pin-screen">Loading…</div>;
 
@@ -121,10 +127,12 @@ export default function KidHome() {
     }
   }
 
-  const grouped = CATEGORY_ORDER.map((cat) => ({
-    cat,
-    tasks: data.tasks.filter((t) => t.category === cat),
-  })).filter((g) => g.tasks.length > 0);
+  const grouped = (data.categories || [])
+    .map((cat) => ({
+      cat,
+      tasks: data.tasks.filter((t) => t.category_id === cat.id),
+    }))
+    .filter((g) => g.tasks.length > 0);
 
   return (
     <div className="kid-home" style={cssVars}>
@@ -201,10 +209,10 @@ export default function KidHome() {
       </div>
 
       {grouped.map(({ cat, tasks }) => (
-        <section key={cat}>
+        <section key={cat.id}>
           <div className="category-header">
-            <span>{CATEGORY_LABELS[cat].icon}</span>
-            {CATEGORY_LABELS[cat].label}
+            <span>{cat.icon}</span>
+            {cat.label}
           </div>
           {tasks.map((task) => (
             <TaskCard key={task.id} task={task} theme={theme} onTap={() => onTapTask(task)} />

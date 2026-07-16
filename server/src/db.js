@@ -22,17 +22,26 @@ CREATE TABLE IF NOT EXISTS kids (
   theme TEXT NOT NULL CHECK (theme IN ('soccer', 'dino')),
   age INTEGER NOT NULL,
   vault_mode TEXT NOT NULL DEFAULT 'manual' CHECK (vault_mode IN ('manual', 'auto_split')),
-  auto_split_ratio REAL NOT NULL DEFAULT 0.7
+  auto_split_ratio REAL NOT NULL DEFAULT 0.7,
+  secret_code TEXT
+);
+
+CREATE TABLE IF NOT EXISTS categories (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  label TEXT NOT NULL,
+  icon TEXT NOT NULL DEFAULT '📋',
+  position INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS tasks (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   title TEXT NOT NULL,
-  category TEXT NOT NULL CHECK (category IN ('morning', 'evening', 'personal_space', 'chores', 'social_school')),
+  category_id INTEGER NOT NULL REFERENCES categories(id),
   point_value INTEGER NOT NULL,
   icon TEXT NOT NULL DEFAULT '⭐',
   active INTEGER NOT NULL DEFAULT 1,
-  kid_id INTEGER REFERENCES kids(id)
+  kid_id INTEGER REFERENCES kids(id),
+  is_bonus INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS completions (
@@ -103,10 +112,59 @@ CREATE TABLE IF NOT EXISTS parent_actions (
 );
 `);
 
-// Migration for databases created before the mystery-task feature.
-const taskColumns = db.prepare(`PRAGMA table_info(tasks)`).all().map((c) => c.name);
-if (!taskColumns.includes('is_bonus')) {
-  db.exec(`ALTER TABLE tasks ADD COLUMN is_bonus INTEGER NOT NULL DEFAULT 0`);
+// ---- migrations for databases created by earlier versions ----
+
+const kidColumns = db.prepare(`PRAGMA table_info(kids)`).all().map((c) => c.name);
+if (!kidColumns.includes('secret_code')) {
+  db.exec(`ALTER TABLE kids ADD COLUMN secret_code TEXT`);
+}
+
+// Default categories (also the mapping targets for legacy enum values).
+if (db.prepare(`SELECT COUNT(*) AS n FROM categories`).get().n === 0) {
+  const insert = db.prepare(`INSERT INTO categories (label, icon, position) VALUES (?, ?, ?)`);
+  insert.run('Morning', '🌅', 1);
+  insert.run('Evening', '🌙', 2);
+  insert.run('My Space', '🧹', 3);
+  insert.run('Family Jobs', '🏠', 4);
+  insert.run('School & Feelings', '🧠', 5);
+}
+
+// Legacy tasks table used a CHECK-constrained category string; rebuild it
+// around category_id. (SQLite can't drop a CHECK in place.)
+let taskColumns = db.prepare(`PRAGMA table_info(tasks)`).all().map((c) => c.name);
+if (taskColumns.includes('category')) {
+  if (!taskColumns.includes('is_bonus')) {
+    db.exec(`ALTER TABLE tasks ADD COLUMN is_bonus INTEGER NOT NULL DEFAULT 0`);
+  }
+  db.pragma('foreign_keys = OFF');
+  db.transaction(() => {
+    db.exec(`
+      CREATE TABLE tasks_migrated (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT NOT NULL,
+        category_id INTEGER NOT NULL REFERENCES categories(id),
+        point_value INTEGER NOT NULL,
+        icon TEXT NOT NULL DEFAULT '⭐',
+        active INTEGER NOT NULL DEFAULT 1,
+        kid_id INTEGER REFERENCES kids(id),
+        is_bonus INTEGER NOT NULL DEFAULT 0
+      );
+      INSERT INTO tasks_migrated (id, title, category_id, point_value, icon, active, kid_id, is_bonus)
+      SELECT id, title,
+             CASE category
+               WHEN 'morning' THEN 1
+               WHEN 'evening' THEN 2
+               WHEN 'personal_space' THEN 3
+               WHEN 'chores' THEN 4
+               ELSE 5
+             END,
+             point_value, icon, active, kid_id, is_bonus
+      FROM tasks;
+      DROP TABLE tasks;
+      ALTER TABLE tasks_migrated RENAME TO tasks;
+    `);
+  })();
+  db.pragma('foreign_keys = ON');
 }
 
 /** Current point balances per bucket for a kid. */

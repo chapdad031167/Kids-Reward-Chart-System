@@ -13,10 +13,18 @@ dashboard from any device on the home network. LAN-only — no cloud, no account
 kid's themed home screen — today's tasks grouped by category, a daily progress meter, streaks,
 points balances (Spending / Savings split), and a reward shop. Tapping a task marks it
 *pending* with an instant celebration animation; a parent approves it later. After 90 seconds
-of inactivity the kiosk returns to the avatar screen. Kids never see each other's progress.
+of inactivity the kiosk returns to the avatar screen. Kids never see each other's progress —
+and each kid can optionally get a **secret emoji code** (set in Kids & Vaults): their avatar
+shows a 🔒, and opening their screen means tapping their 3 secret emoji in order on a
+9-emoji grid. Wrong code shakes and resets; returning to the avatar screen re-locks.
 
-**Parent dashboard** (`/parent`, or long-press the logo on the avatar screen): protected by a
-4-digit PIN (tap the pad or type on a keyboard). Approve/reject completions and reward
+**Task categories** are parent-editable (Tasks → Manage Categories): rename the defaults,
+change their icons, or add new ones (e.g. "Weekend Jobs") — kid screens regroup instantly.
+All icons across tasks, rewards, and categories are chosen from a curated kid-friendly emoji
+picker rather than free text.
+
+**Parent dashboard** (the "👨‍👧‍👦 Parents" button on the avatar screen, `/parent`, or
+long-press the logo): protected by a 4-digit PIN (tap the pad or type on a keyboard). Approve/reject completions and reward
 requests (with Quick Approve All), undo the last approval (restores points *and* streaks),
 manage tasks and rewards, configure each kid's vault, and view per-kid history. Two
 correction tools live in Kids & Vaults for when a mistake slips past undo: **Adjust points**
