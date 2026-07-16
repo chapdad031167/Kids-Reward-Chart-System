@@ -11,11 +11,11 @@ import { todayStr, prevDay, nextDay } from './dates.js';
  * so streak math keeps skipping them forever after.
  */
 
-function getSetting(key) {
+export function getSetting(key) {
   return db.prepare(`SELECT value FROM settings WHERE key = ?`).get(key)?.value ?? null;
 }
 
-function setSetting(key, value) {
+export function setSetting(key, value) {
   db.prepare(
     `INSERT INTO settings (key, value) VALUES (?, ?)
      ON CONFLICT (key) DO UPDATE SET value = excluded.value`

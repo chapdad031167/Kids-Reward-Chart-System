@@ -104,6 +104,14 @@ CREATE TABLE IF NOT EXISTS bonus_assignments (
   PRIMARY KEY (kid_id, date)
 );
 
+CREATE TABLE IF NOT EXISTS badges (
+  kid_id INTEGER NOT NULL REFERENCES kids(id),
+  badge_key TEXT NOT NULL,
+  earned_at TEXT NOT NULL,
+  seen INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (kid_id, badge_key)
+);
+
 CREATE TABLE IF NOT EXISTS settings (
   key TEXT PRIMARY KEY,
   value TEXT NOT NULL

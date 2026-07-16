@@ -614,6 +614,108 @@ button {
   padding: 2px 9px;
 }
 
+/* ---------- Levels & badges ---------- */
+
+.kid-title {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.kid-title h1 {
+  margin: 0;
+  font-size: 30px;
+}
+
+.level-chip {
+  align-self: flex-start;
+  background: rgba(255, 255, 255, 0.22);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 800;
+  padding: 3px 12px;
+  border-radius: 10px;
+  letter-spacing: 0.3px;
+}
+
+.badges-btn {
+  margin-top: 10px;
+  width: 100%;
+  min-height: 52px;
+  border-radius: 14px;
+  background: var(--chip);
+  color: var(--card-text);
+  font-size: 15px;
+  font-weight: 800;
+  border: 2px solid var(--accent);
+}
+
+.badge-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 10px;
+}
+
+.badge-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 6px;
+  border-radius: 14px;
+  text-align: center;
+}
+
+.badge-cell.earned {
+  background: #fff7df;
+  border: 2px solid #f5c518;
+}
+
+.badge-cell.locked {
+  background: #f1f5f4;
+  filter: grayscale(1);
+  opacity: 0.55;
+}
+
+.badge-icon {
+  font-size: 34px;
+}
+
+.badge-name {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.badge-reveal-icon {
+  font-size: 96px;
+  animation: hatch-pop 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+  z-index: 2;
+}
+
+/* ---------- Family goal ---------- */
+
+.family-goal {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: #eef6ff;
+  border: 2px solid #63b3ed;
+  color: #1a365d;
+}
+
+.family-goal.reached {
+  background: #d9f5e1;
+  border-color: #2e9e56;
+}
+
+.family-goal-icon {
+  font-size: 34px;
+}
+
 /* ---------- Savings goal ---------- */
 
 .goal-panel {
@@ -1291,4 +1393,132 @@ button {
 @media (max-width: 600px) {
   .avatar-row { gap: 20px; }
   .avatar-btn { width: 70vw; aspect-ratio: 1.4; }
+}
+
+/* ---------- Phone-size layout ---------- */
+
+@media (max-width: 480px) {
+  .kid-home {
+    padding: 10px 10px 80px;
+  }
+
+  .kid-header {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .kid-header .mascot {
+    font-size: 38px;
+  }
+
+  .kid-title h1 {
+    font-size: 22px;
+  }
+
+  .home-btn {
+    flex: 1;
+    min-height: 52px;
+    font-size: 14px;
+    padding: 10px 12px;
+    white-space: nowrap;
+  }
+
+  .panel {
+    padding: 12px;
+  }
+
+  .panel h2 {
+    font-size: 17px;
+  }
+
+  .vault-box .vault-amount {
+    font-size: 24px;
+  }
+
+  .vault-box .vault-label {
+    font-size: 12px;
+  }
+
+  .task-main {
+    padding: 10px 12px;
+    gap: 10px;
+  }
+
+  .task-icon {
+    font-size: 28px;
+    width: 36px;
+  }
+
+  .task-title {
+    font-size: 15px;
+  }
+
+  .task-banner {
+    font-size: 13px;
+    padding: 8px 10px;
+  }
+
+  .category-header {
+    font-size: 17px;
+  }
+
+  .mystery-title {
+    font-size: 17px;
+  }
+
+  .mystery-icon {
+    font-size: 36px;
+  }
+
+  .egg-progress {
+    gap: 10px;
+  }
+
+  .egg-svg {
+    width: 72px;
+    height: 92px;
+  }
+
+  .parent-content {
+    margin: 0 6px;
+    padding: 12px;
+  }
+
+  .parent-tabs {
+    padding: 10px 6px 0;
+  }
+
+  .parent-tab {
+    padding: 10px 12px;
+    font-size: 13px;
+  }
+
+  .parent-topbar h1 {
+    font-size: 16px;
+  }
+
+  .parent-topbar .btn {
+    min-height: 44px;
+    padding: 8px 12px;
+    font-size: 13px;
+  }
+
+  .pending-item .who {
+    min-width: 100%;
+  }
+
+  .code-grid {
+    grid-template-columns: repeat(3, 76px);
+    gap: 10px;
+  }
+
+  .code-key {
+    width: 76px;
+    height: 76px;
+    font-size: 36px;
+  }
+
+  .reward-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }

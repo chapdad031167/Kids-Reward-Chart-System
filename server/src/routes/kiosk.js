@@ -6,6 +6,8 @@ import { notifyParent } from '../notify.js';
 import { getBonusForToday, revealBonus } from '../bonus.js';
 import { vacationState } from '../vacation.js';
 import { isScheduledOn } from '../schedule.js';
+import { checkBadges, badgeState, markBadgesSeen, levelFor } from '../badges.js';
+import { getFamilyGoal } from '../familyGoal.js';
 
 export const kiosk = Router();
 
@@ -51,6 +53,7 @@ kiosk.get('/kids/:id/today', (req, res) => {
   for (const t of tasks) t.streak = displayStreak(streaksByTask.get(t.id), t.days);
 
   const bonus = getBonusForToday(kid.id);
+  checkBadges(kid.id); // lazy catch-up (e.g. saver badge after auto-split)
 
   const doneCount = tasks.filter((t) => t.status === 'pending' || t.status === 'approved').length;
   let earnedToday = tasks
@@ -98,6 +101,9 @@ kiosk.get('/kids/:id/today', (req, res) => {
     categories,
     bonus,
     goal,
+    badges: badgeState(kid.id),
+    level: levelFor(kid.id),
+    familyGoal: getFamilyGoal(),
     vacation: vacationState().on,
     progress: {
       doneCount,
@@ -210,6 +216,14 @@ kiosk.post('/redemptions', (req, res) => {
     .run(kid_id, reward_id, reward.cost, nowIso());
   notifyParent('Reward request', `${kid.name} wants: ${reward.title} (${reward.cost} pts)`, 'gift');
   res.status(201).json(db.prepare(`SELECT * FROM redemptions WHERE id = ?`).get(info.lastInsertRowid));
+});
+
+/** Kid dismissed the "new badge" celebration. */
+kiosk.post('/kids/:id/badges/seen', (req, res) => {
+  const kid = db.prepare(`SELECT id FROM kids WHERE id = ?`).get(req.params.id);
+  if (!kid) return res.status(404).json({ error: 'kid_not_found' });
+  markBadgesSeen(kid.id);
+  res.json({ ok: true });
 });
 
 /** Kid picks (or clears) the reward they're saving toward. */

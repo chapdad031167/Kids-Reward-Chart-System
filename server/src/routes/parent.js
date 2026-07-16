@@ -16,6 +16,8 @@ import {
 } from '../service.js';
 import { vacationState, setVacation } from '../vacation.js';
 import { listBackups, runBackup } from '../backup.js';
+import { checkBadges } from '../badges.js';
+import { getFamilyGoal, setFamilyGoal } from '../familyGoal.js';
 
 const PARENT_PIN = process.env.PARENT_PIN || '1234';
 
@@ -87,12 +89,28 @@ parent.post('/award', (req, res) => {
   const { kid_ids, amount, note } = req.body || {};
   const result = awardPoints(kid_ids, Number(amount), note);
   if (!result.ok) return res.status(400).json({ error: result.reason });
+  for (const kidId of kid_ids) checkBadges(kidId);
   res.json({ ok: true });
 });
 
+// ---- Family goal ----
+
+parent.get('/family-goal', (req, res) => {
+  res.json(getFamilyGoal());
+});
+
+parent.post('/family-goal', (req, res) => {
+  const input = req.body?.clear ? null : req.body;
+  const result = setFamilyGoal(input);
+  if (result?.error) return res.status(400).json(result);
+  res.json(result);
+});
+
 parent.post('/completions/:id/approve', (req, res) => {
+  const completion = db.prepare(`SELECT kid_id FROM completions WHERE id = ?`).get(req.params.id);
   const ok = approveCompletion(Number(req.params.id));
   if (!ok) return res.status(400).json({ error: 'not_pending' });
+  if (completion) checkBadges(completion.kid_id);
   res.json({ ok: true });
 });
 
@@ -115,7 +133,9 @@ parent.post('/redemptions/:id/reject', (req, res) => {
 });
 
 parent.post('/approve-all', (req, res) => {
-  res.json({ ok: true, approved: approveAllToday() });
+  const approved = approveAllToday();
+  for (const kid of db.prepare(`SELECT id FROM kids`).all()) checkBadges(kid.id);
+  res.json({ ok: true, approved });
 });
 
 parent.post('/undo', (req, res) => {

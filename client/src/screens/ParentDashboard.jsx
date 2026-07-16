@@ -739,10 +739,13 @@ function KidsTab({ client, notify }) {
   const [settingCode, setSettingCode] = useState(null); // kid
   const [backups, setBackups] = useState([]);
   const [awarding, setAwarding] = useState(false);
+  const [familyGoal, setFamilyGoalState] = useState(null);
+  const [editingFamilyGoal, setEditingFamilyGoal] = useState(false);
 
   const load = useCallback(() => {
     client.get('/api/parent/kids').then(setKids).catch(() => notify('Failed to load kids'));
     client.get('/api/parent/backups').then(setBackups).catch(() => {});
+    client.get('/api/parent/family-goal').then(setFamilyGoalState).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -793,9 +796,27 @@ function KidsTab({ client, notify }) {
 
   return (
     <div>
-      <button className="btn primary" style={{ marginBottom: 14 }} onClick={() => setAwarding(true)}>
-        🎁 Bonus award
-      </button>
+      <div style={{ display: 'flex', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
+        <button className="btn primary" onClick={() => setAwarding(true)}>
+          🎁 Bonus award
+        </button>
+        <button className="btn secondary" onClick={() => setEditingFamilyGoal(true)}>
+          👨‍👩‍👦‍👦 Family goal
+          {familyGoal ? `: ${familyGoal.progress}/${familyGoal.target}${familyGoal.reached ? ' 🎉' : ''}` : ': none'}
+        </button>
+      </div>
+
+      {editingFamilyGoal && (
+        <FamilyGoalModal
+          current={familyGoal}
+          client={client}
+          notify={notify}
+          onClose={() => {
+            setEditingFamilyGoal(false);
+            load();
+          }}
+        />
+      )}
 
       {awarding && (
         <AwardModal
@@ -932,6 +953,68 @@ function KidsTab({ client, notify }) {
         </button>
       </div>
     </div>
+  );
+}
+
+function FamilyGoalModal({ current, client, notify, onClose }) {
+  const [title, setTitle] = useState(current?.title || '');
+  const [icon, setIcon] = useState(current?.icon || '🍕');
+  const [target, setTarget] = useState(current ? String(current.target) : '');
+  const parsed = Number(target);
+  const valid = title.trim().length > 0 && Number.isInteger(parsed) && parsed > 0;
+
+  async function save() {
+    try {
+      await client.post('/api/parent/family-goal', { title: title.trim(), icon, target: parsed });
+      notify(`Family goal set: ${title.trim()} (${parsed} points)`);
+      onClose();
+    } catch {
+      notify('Could not save the goal — check the fields');
+    }
+  }
+
+  async function clear() {
+    await client.post('/api/parent/family-goal', { clear: true }).catch(() => {});
+    notify('Family goal cleared');
+    onClose();
+  }
+
+  return (
+    <Modal title="👨‍👩‍👦‍👦 Family goal" onClose={onClose}>
+      <p style={{ fontSize: 14, color: '#4a5568' }}>
+        One shared target both kids work toward together — they see a combined progress bar,
+        never each other's numbers. Counts every point earned from now on (tasks, mysteries,
+        awards). {current && `Current: "${current.title}" — ${current.progress}/${current.target}.`}
+        {' '}Setting a new goal restarts progress from zero.
+      </p>
+      <div className="form-grid">
+        <label>
+          What's the prize?
+          <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Pizza & movie night" />
+        </label>
+        <label>
+          Icon
+          <EmojiPicker value={icon} onChange={setIcon} />
+        </label>
+        <label>
+          Combined points needed
+          <input type="number" min="1" value={target} onChange={(e) => setTarget(e.target.value)} placeholder="100" />
+        </label>
+      </div>
+      <div className="modal-actions">
+        {current && (
+          <button className="btn danger" onClick={clear}>
+            Clear goal
+          </button>
+        )}
+        <button className="btn secondary" onClick={onClose}>
+          Cancel
+        </button>
+        <button className="btn primary" disabled={!valid} onClick={save}>
+          {current ? 'Replace goal' : 'Set goal'}
+        </button>
+      </div>
+    </Modal>
   );
 }
 

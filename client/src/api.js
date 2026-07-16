@@ -49,8 +49,17 @@ export function queuedTapCount(kidId) {
  * { ok: true, queued: true } when it was stored for later sync.
  * Only a network failure queues — a 4xx (bad task etc.) throws.
  */
+/**
+ * crypto.randomUUID only exists on secure origins (https/localhost); the
+ * kiosk runs over plain http on the LAN, so phones need the fallback.
+ */
+function makeClientId() {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
+  return `c-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
+}
+
 export async function tapTask(taskId, kidId) {
-  const body = { task_id: taskId, kid_id: kidId, client_id: crypto.randomUUID() };
+  const body = { task_id: taskId, kid_id: kidId, client_id: makeClientId() };
   try {
     await api.post('/api/completions', body);
     return { ok: true };

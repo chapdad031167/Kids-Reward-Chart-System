@@ -17,6 +17,8 @@ export default function KidHome() {
   const [queuedCount, setQueuedCount] = useState(0);
   const [showRewards, setShowRewards] = useState(false);
   const [showTransfer, setShowTransfer] = useState(false);
+  const [showBadges, setShowBadges] = useState(false);
+  const [badgeReveal, setBadgeReveal] = useState(null); // newly earned badge being celebrated
   const [easterEgg, setEasterEgg] = useState(false);
   const [revealing, setRevealing] = useState(false);
   const [muted, setMutedState] = useState(isMuted);
@@ -45,6 +47,15 @@ export default function KidHome() {
       stopSync();
     };
   }, [refresh]);
+
+  // New badge? Celebrate the first unseen one, then mark all seen.
+  useEffect(() => {
+    if (!data?.badges?.newUnseen?.length || badgeReveal) return;
+    setBadgeReveal(data.badges.newUnseen[0]);
+    playSound('fanfare');
+    api.post(`/api/kids/${kidId}/badges/seen`).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data]);
 
   // Day-complete fanfare: fires once when the last task flips to done
   // (not on initial load of an already-finished day).
@@ -157,7 +168,15 @@ export default function KidHome() {
         <span className="mascot" onClick={onMascotTap}>
           {theme.icons.mascot}
         </span>
-        <h1>Hi, {data.kid.name}!</h1>
+        <span className="kid-title">
+          <h1>Hi, {data.kid.name}!</h1>
+          {data.level && (
+            <span className="level-chip">
+              Lv {data.level.n} ·{' '}
+              {theme.terms.levelTitles[Math.min(data.level.n - 1, theme.terms.levelTitles.length - 1)]}
+            </span>
+          )}
+        </span>
         <button className="home-btn" onClick={() => setShowRewards(true)}>
           🎁 {theme.terms.rewards}
         </button>
@@ -237,6 +256,37 @@ export default function KidHome() {
             Move points into my {theme.terms.savings}
           </button>
         )}
+        {data.badges && (
+          <button className="badges-btn" onClick={() => setShowBadges(true)}>
+            🏅 My {theme.terms.badges} ({data.badges.earned.length}/
+            {data.badges.earned.length + data.badges.locked.length})
+          </button>
+        )}
+        {data.familyGoal && (
+          <div className={`family-goal${data.familyGoal.reached ? ' reached' : ''}`}>
+            <span className="family-goal-icon">{data.familyGoal.icon}</span>
+            <span style={{ flex: 1 }}>
+              <div className="goal-title">
+                👨‍👩‍👦‍👦 {theme.terms.familyGoal}: {data.familyGoal.title}
+              </div>
+              {data.familyGoal.reached ? (
+                <div className="goal-reached-text">WE DID IT, TEAM! 🎉</div>
+              ) : (
+                <>
+                  <div className="meter-track goal-track">
+                    <div
+                      className="meter-fill"
+                      style={{ width: `${Math.max(6, Math.round((data.familyGoal.progress / data.familyGoal.target) * 100))}%` }}
+                    />
+                  </div>
+                  <div className="goal-caption">
+                    {data.familyGoal.progress} of {data.familyGoal.target} — everyone's points count!
+                  </div>
+                </>
+              )}
+            </span>
+          </div>
+        )}
         {data.goal && (
           <div className={`goal-panel${data.goal.reached ? ' reached' : ''}`}>
             <span className="goal-icon">{data.goal.reward.icon}</span>
@@ -293,6 +343,43 @@ export default function KidHome() {
       ))}
 
       {celebrating && <Celebration theme={theme} onDone={() => setCelebrating(false)} />}
+      {badgeReveal && (
+        <div className="celebration-overlay" onClick={() => setBadgeReveal(null)}>
+          <div className="celebration-stage">
+            <span className="badge-reveal-icon">{badgeReveal.icon}</span>
+            <div className="celebration-word" style={{ fontSize: 'clamp(32px, 8vw, 52px)' }}>
+              NEW BADGE!
+            </div>
+            <div className="celebration-sub">
+              {badgeReveal.title}
+              {badgeReveal.bonus > 0 ? ` · +${badgeReveal.bonus} bonus points!` : ''}
+            </div>
+          </div>
+        </div>
+      )}
+      {showBadges && data.badges && (
+        <Modal title={`🏅 My ${theme.terms.badges}`} onClose={() => setShowBadges(false)}>
+          <div className="badge-grid">
+            {data.badges.earned.map((b) => (
+              <div key={b.key} className="badge-cell earned">
+                <span className="badge-icon">{b.icon}</span>
+                <span className="badge-name">{b.title}</span>
+              </div>
+            ))}
+            {data.badges.locked.map((b) => (
+              <div key={b.key} className="badge-cell locked">
+                <span className="badge-icon">{b.icon}</span>
+                <span className="badge-name">{b.title}</span>
+              </div>
+            ))}
+          </div>
+          <div className="modal-actions">
+            <button className="btn secondary" onClick={() => setShowBadges(false)}>
+              Close
+            </button>
+          </div>
+        </Modal>
+      )}
       {easterEgg && <div className="easter-egg-bubble">ooo wooo… DINOS!!! 🦖🦕</div>}
       {toast && <Toast message={toast} onDone={() => setToast(null)} />}
       {showRewards && (

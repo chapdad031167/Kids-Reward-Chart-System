@@ -42,6 +42,14 @@ the pool in the Tasks tab: any task with the ✨ *Mystery bonus task* checkbox i
 the daily list and enters the mystery rotation. The day schedule and task pick are
 deterministic per (kid, date), so restarts and multiple devices always agree.
 
+**Badges, levels & family goal**: kids earn permanent badges (first points, 100/250/500
+lifetime, 3/7/14/30-day streaks — streak badges pay bonus points — mysteries solved, perfect
+day, super saver) with a full-screen celebration on earn and a themed trophy case (Trophy
+Case / Fossil Collection) showing earned + locked. Lifetime points translate to a level with
+themed titles (Rookie → Legend / Dino Egg → Dino Legend) shown by their name. Parents can
+also set a **family goal** — one shared target both kids fill together ("100 points → pizza
+night"); kids see only the combined bar, never each other's numbers.
+
 **Savings goals**: in the reward shop, a reward a kid can't afford yet shows "tap to make it
 your goal" — picking it puts a themed goal panel (⭐ My Trophy Goal / My Dino Dream) on their
 home screen with a progress bar toward the cost, and it celebrates when they can afford it.
