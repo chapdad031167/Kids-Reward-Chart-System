@@ -19,9 +19,14 @@ app.get('/api/health', (req, res) => res.json({ ok: true }));
 app.use('/api', kiosk);
 app.use('/api/parent', parent);
 
-// Serve the built frontend (client/dist is copied to ./public in the Docker image).
-const staticDir = process.env.STATIC_DIR || path.join(__dirname, '..', 'public');
-if (fs.existsSync(staticDir)) {
+// Serve the built frontend: ./public in the Docker image, or client/dist
+// when running straight from a checkout.
+const staticDir =
+  process.env.STATIC_DIR ||
+  [path.join(__dirname, '..', 'public'), path.join(__dirname, '..', '..', 'client', 'dist')].find(
+    (dir) => fs.existsSync(path.join(dir, 'index.html'))
+  );
+if (staticDir && fs.existsSync(staticDir)) {
   app.use(express.static(staticDir));
   app.get('*', (req, res, next) => {
     if (req.path.startsWith('/api/')) return next();
@@ -37,4 +42,9 @@ app.use((err, req, res, next) => {
 app.listen(PORT, () => {
   console.log(`Reward chart server listening on port ${PORT}`);
   console.log(`SQLite database: ${DB_PATH}`);
+  if (staticDir && fs.existsSync(staticDir)) {
+    console.log(`Serving frontend from: ${staticDir}`);
+  } else {
+    console.warn('No built frontend found — run "npm run build" in client/ (API-only mode).');
+  }
 });
