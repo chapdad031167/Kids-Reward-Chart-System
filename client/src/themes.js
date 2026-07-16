@@ -25,6 +25,8 @@ export const THEMES = {
       savings: 'Season Fund',
       allDone: 'FULL TIME — you won the day! 🏆',
       rewards: 'Trophy Shop',
+      pendingBanner: 'Waiting for the ref to check it!',
+      rejectedBanner: 'No goal this time — ask a grown-up',
     },
     icons: {
       mascot: '⚽',
@@ -56,6 +58,8 @@ export const THEMES = {
       savings: 'Dino Nest Egg',
       allDone: 'The egg HATCHED! 🐣',
       rewards: 'Dino Store',
+      pendingBanner: 'Waiting for a grown-up dino to check it!',
+      rejectedBanner: 'Not this time — ask a grown-up',
     },
     icons: {
       mascot: '🦖',

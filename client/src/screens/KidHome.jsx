@@ -188,12 +188,16 @@ export default function KidHome() {
 }
 
 function TaskCard({ task, theme, onTap }) {
-  const state =
+  // Locked cards get a full-width banner so "already tapped today" is
+  // unmistakable — a subtle side label read as "broken button" to testers.
+  const banner =
     task.status === 'approved'
-      ? { cls: 'approved', label: `✔ ${theme.terms.celebration}` }
+      ? { cls: 'approved', icon: '✔', label: `${theme.terms.celebration} +${task.point_value} earned` }
       : task.status === 'pending'
-        ? { cls: 'pending', label: '⏳ Checking…' }
-        : null;
+        ? { cls: 'pending', icon: '⏳', label: theme.terms.pendingBanner }
+        : task.status === 'rejected'
+          ? { cls: 'rejected', icon: '✋', label: theme.terms.rejectedBanner }
+          : null;
 
   return (
     <button
@@ -201,19 +205,26 @@ function TaskCard({ task, theme, onTap }) {
       onClick={onTap}
       disabled={!!task.status}
     >
-      <span className="task-icon">{task.icon}</span>
-      <span className="task-body">
-        <div className="task-title">{task.title}</div>
-        <div className="task-meta">
-          <span className="points-chip">+{task.point_value}</span>
-          {task.streak > 0 && (
-            <span className="streak-chip">
-              {theme.icons.streak} {task.streak} day {theme.terms.streak}
-            </span>
-          )}
-        </div>
+      <span className="task-main">
+        <span className="task-icon">{task.icon}</span>
+        <span className="task-body">
+          <div className="task-title">{task.title}</div>
+          <div className="task-meta">
+            <span className="points-chip">+{task.point_value}</span>
+            {task.streak > 0 && (
+              <span className="streak-chip">
+                {theme.icons.streak} {task.streak} day {theme.terms.streak}
+              </span>
+            )}
+          </div>
+        </span>
       </span>
-      {state && <span className={`task-state ${state.cls}`}>{state.label}</span>}
+      {banner && (
+        <span className={`task-banner ${banner.cls}`}>
+          <span className="task-banner-icon">{banner.icon}</span>
+          {banner.label}
+        </span>
+      )}
     </button>
   );
 }
