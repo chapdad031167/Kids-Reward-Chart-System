@@ -34,7 +34,7 @@ parent.get('/pending', (req, res) => {
   const completions = db
     .prepare(
       `SELECT c.id, c.date, c.completed_at, k.name AS kid_name, k.id AS kid_id,
-              t.title, t.icon, t.point_value
+              t.title, t.icon, t.point_value, t.is_bonus
        FROM completions c
        JOIN kids k ON k.id = c.kid_id
        JOIN tasks t ON t.id = c.task_id
@@ -111,12 +111,13 @@ function validTaskBody(body) {
 
 parent.post('/tasks', (req, res) => {
   if (!validTaskBody(req.body)) return res.status(400).json({ error: 'invalid_task' });
-  const { title, category, point_value, icon, kid_id } = req.body;
+  const { title, category, point_value, icon, kid_id, is_bonus } = req.body;
   const info = db
     .prepare(
-      `INSERT INTO tasks (title, category, point_value, icon, active, kid_id) VALUES (?, ?, ?, ?, 1, ?)`
+      `INSERT INTO tasks (title, category, point_value, icon, active, kid_id, is_bonus)
+       VALUES (?, ?, ?, ?, 1, ?, ?)`
     )
-    .run(title.trim(), category, point_value, icon || '⭐', kid_id || null);
+    .run(title.trim(), category, point_value, icon || '⭐', kid_id || null, is_bonus ? 1 : 0);
   res.status(201).json(db.prepare(`SELECT * FROM tasks WHERE id = ?`).get(info.lastInsertRowid));
 });
 
@@ -130,11 +131,12 @@ parent.patch('/tasks/:id', (req, res) => {
     icon: req.body.icon ?? task.icon,
     active: req.body.active !== undefined ? (req.body.active ? 1 : 0) : task.active,
     kid_id: req.body.kid_id !== undefined ? req.body.kid_id : task.kid_id,
+    is_bonus: req.body.is_bonus !== undefined ? (req.body.is_bonus ? 1 : 0) : task.is_bonus,
   };
   if (!validTaskBody(merged)) return res.status(400).json({ error: 'invalid_task' });
   db.prepare(
-    `UPDATE tasks SET title = ?, category = ?, point_value = ?, icon = ?, active = ?, kid_id = ? WHERE id = ?`
-  ).run(merged.title.trim(), merged.category, merged.point_value, merged.icon, merged.active, merged.kid_id, task.id);
+    `UPDATE tasks SET title = ?, category = ?, point_value = ?, icon = ?, active = ?, kid_id = ?, is_bonus = ? WHERE id = ?`
+  ).run(merged.title.trim(), merged.category, merged.point_value, merged.icon, merged.active, merged.kid_id, merged.is_bonus, task.id);
   res.json(db.prepare(`SELECT * FROM tasks WHERE id = ?`).get(task.id));
 });
 

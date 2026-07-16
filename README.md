@@ -24,6 +24,16 @@ correction tools live in Kids & Vaults for when a mistake slips past undo: **Adj
 day — clears today's completions, claws back today's points, and rewinds streaks as if the
 day hadn't been tapped).
 
+**Mystery challenges ("Fog of War")**: on pseudo-random days (~4 out of 7, different per
+kid), a glowing mystery object appears on the kid's home screen — a golden trophy box for
+the soccer theme, a mystery egg for the dino theme. Tapping it reveals a bonus task drawn
+from a parent-managed pool of bigger, higher-point challenges ("Wash the car with a
+grown-up", "Secret kindness mission", …). The revealed task completes and gets approved
+like any other, but doesn't count toward the daily progress meter — it's pure bonus. Manage
+the pool in the Tasks tab: any task with the ✨ *Mystery bonus task* checkbox is hidden from
+the daily list and enters the mystery rotation. The day schedule and task pick are
+deterministic per (kid, date), so restarts and multiple devices always agree.
+
 **Notifications (optional)**: set `NTFY_URL` to an ntfy topic URL and the app pushes a
 notification whenever a kid taps a task or requests a reward, so you can approve from your
 phone without watching the queue. Unset = disabled; a down ntfy server never blocks the app.
@@ -122,7 +132,6 @@ Dockerfile         multi-stage build: Vite build → static files served by Expr
 - **Holiday / Vacation Mode** — a parent toggle for stretches when daily routines aren't
   practical (travel, school breaks): pause the daily task list and freeze streaks so they
   resume where they left off instead of breaking.
-- **"Fog of War" mystery/random bonus tasks.**
 - **Multi-household or external/cloud accounts** — the app stays LAN-only.
 - **Audio/sound effects** — celebrations are visual-only by design so sound can be layered
   in later without rework (trigger point is marked in `Celebration.jsx`).

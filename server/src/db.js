@@ -86,6 +86,14 @@ CREATE TABLE IF NOT EXISTS redemptions (
   reviewed_at TEXT
 );
 
+CREATE TABLE IF NOT EXISTS bonus_assignments (
+  kid_id INTEGER NOT NULL REFERENCES kids(id),
+  date TEXT NOT NULL,
+  task_id INTEGER NOT NULL REFERENCES tasks(id),
+  revealed INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (kid_id, date)
+);
+
 CREATE TABLE IF NOT EXISTS parent_actions (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   type TEXT NOT NULL,
@@ -94,6 +102,12 @@ CREATE TABLE IF NOT EXISTS parent_actions (
   undone INTEGER NOT NULL DEFAULT 0
 );
 `);
+
+// Migration for databases created before the mystery-task feature.
+const taskColumns = db.prepare(`PRAGMA table_info(tasks)`).all().map((c) => c.name);
+if (!taskColumns.includes('is_bonus')) {
+  db.exec(`ALTER TABLE tasks ADD COLUMN is_bonus INTEGER NOT NULL DEFAULT 0`);
+}
 
 /** Current point balances per bucket for a kid. */
 export function balances(kidId) {

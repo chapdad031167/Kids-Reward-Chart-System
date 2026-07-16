@@ -19,6 +19,7 @@ export default function KidHome() {
   const [showRewards, setShowRewards] = useState(false);
   const [showTransfer, setShowTransfer] = useState(false);
   const [easterEgg, setEasterEgg] = useState(false);
+  const [revealing, setRevealing] = useState(false);
   const mascotTaps = useRef([]);
 
   // Kiosk behavior: bounce back to the avatar screen after 90s idle.
@@ -78,6 +79,36 @@ export default function KidHome() {
     }
   }
 
+  async function onRevealMystery() {
+    if (revealing) return;
+    setRevealing(true);
+    try {
+      const state = await api.post(`/api/kids/${kidId}/bonus/reveal`);
+      // let the wobble animation play before the reveal swap
+      setTimeout(() => {
+        setData((d) => ({ ...d, bonus: state }));
+        setRevealing(false);
+      }, 700);
+    } catch {
+      setRevealing(false);
+      setToast('The mystery is stuck — try again!');
+    }
+  }
+
+  async function onTapBonus() {
+    const bonus = data.bonus;
+    if (!bonus?.revealed || bonus.status) return;
+    setData((d) => ({ ...d, bonus: { ...d.bonus, status: 'pending' } }));
+    setCelebrating(true);
+    try {
+      const result = await tapTask(bonus.task.id, Number(kidId));
+      if (result.queued) setQueuedCount((n) => n + 1);
+    } catch {
+      setToast('Hmm, that one didn’t count. Try again!');
+      refresh();
+    }
+  }
+
   function onMascotTap() {
     // Easter egg: three quick taps on the dino mascot → "ooo wooo".
     if (theme.key !== 'dino') return;
@@ -117,6 +148,28 @@ export default function KidHome() {
       )}
 
       <ProgressMeter theme={theme} progress={data.progress} />
+
+      {data.bonus && !data.bonus.revealed && (
+        <button
+          className={`mystery-card${revealing ? ' revealing' : ''}`}
+          onClick={onRevealMystery}
+        >
+          <span className="mystery-icon">{theme.icons.mystery}</span>
+          <span className="mystery-text">
+            <span className="mystery-title">{theme.terms.mysteryTitle}</span>
+            <span className="mystery-sub">{theme.terms.mysteryTap}</span>
+          </span>
+          <span className="mystery-q">❓</span>
+        </button>
+      )}
+      {data.bonus?.revealed && (
+        <TaskCard
+          task={{ ...data.bonus.task, status: data.bonus.status, streak: 0 }}
+          theme={theme}
+          onTap={onTapBonus}
+          bonus
+        />
+      )}
 
       <div className="panel">
         <h2>My Points</h2>
@@ -187,7 +240,7 @@ export default function KidHome() {
   );
 }
 
-function TaskCard({ task, theme, onTap }) {
+function TaskCard({ task, theme, onTap, bonus = false }) {
   // Locked cards get a full-width banner so "already tapped today" is
   // unmistakable — a subtle side label read as "broken button" to testers.
   const banner =
@@ -201,7 +254,7 @@ function TaskCard({ task, theme, onTap }) {
 
   return (
     <button
-      className={`task-card${task.status ? ` status-${task.status}` : ''}`}
+      className={`task-card${task.status ? ` status-${task.status}` : ''}${bonus ? ' bonus' : ''}`}
       onClick={onTap}
       disabled={!!task.status}
     >
@@ -210,7 +263,9 @@ function TaskCard({ task, theme, onTap }) {
         <span className="task-body">
           <div className="task-title">{task.title}</div>
           <div className="task-meta">
-            <span className="points-chip">+{task.point_value}</span>
+            <span className="points-chip">
+              {bonus ? `✨ ${theme.terms.bonus} ` : ''}+{task.point_value}
+            </span>
             {task.streak > 0 && (
               <span className="streak-chip">
                 {theme.icons.streak} {task.streak} day {theme.terms.streak}

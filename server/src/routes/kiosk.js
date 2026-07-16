@@ -3,6 +3,7 @@ import { db, balances } from '../db.js';
 import { todayStr, nowIso } from '../dates.js';
 import { expireStalePending, displayStreak, transferPoints } from '../service.js';
 import { notifyParent } from '../notify.js';
+import { getBonusForToday, revealBonus } from '../bonus.js';
 
 export const kiosk = Router();
 
@@ -25,7 +26,7 @@ kiosk.get('/kids/:id/today', (req, res) => {
               c.id AS completion_id, c.status
        FROM tasks t
        LEFT JOIN completions c ON c.task_id = t.id AND c.kid_id = ? AND c.date = ?
-       WHERE t.active = 1 AND (t.kid_id IS NULL OR t.kid_id = ?)
+       WHERE t.active = 1 AND t.is_bonus = 0 AND (t.kid_id IS NULL OR t.kid_id = ?)
        ORDER BY t.category, t.id`
     )
     .all(kid.id, today, kid.id);
@@ -34,10 +35,13 @@ kiosk.get('/kids/:id/today', (req, res) => {
   const streaksByTask = new Map(streakRows.map((s) => [s.task_id, s]));
   for (const t of tasks) t.streak = displayStreak(streaksByTask.get(t.id));
 
+  const bonus = getBonusForToday(kid.id);
+
   const doneCount = tasks.filter((t) => t.status === 'pending' || t.status === 'approved').length;
-  const earnedToday = tasks
+  let earnedToday = tasks
     .filter((t) => t.status === 'approved')
     .reduce((sum, t) => sum + t.point_value, 0);
+  if (bonus?.revealed && bonus.status === 'approved') earnedToday += bonus.task.point_value;
 
   const pendingRedemptions = db
     .prepare(
@@ -58,6 +62,7 @@ kiosk.get('/kids/:id/today', (req, res) => {
     },
     balances: balances(kid.id),
     tasks,
+    bonus,
     progress: {
       doneCount,
       totalTasks: tasks.length,
@@ -165,6 +170,15 @@ kiosk.post('/redemptions', (req, res) => {
     .run(kid_id, reward_id, reward.cost, nowIso());
   notifyParent('Reward request', `${kid.name} wants: ${reward.title} (${reward.cost} pts)`, 'gift');
   res.status(201).json(db.prepare(`SELECT * FROM redemptions WHERE id = ?`).get(info.lastInsertRowid));
+});
+
+/** Kid opens today's mystery — reveals the bonus task. */
+kiosk.post('/kids/:id/bonus/reveal', (req, res) => {
+  const kid = db.prepare(`SELECT id FROM kids WHERE id = ?`).get(req.params.id);
+  if (!kid) return res.status(404).json({ error: 'kid_not_found' });
+  const state = revealBonus(kid.id);
+  if (!state) return res.status(404).json({ error: 'no_mystery_today' });
+  res.json(state);
 });
 
 /** Kid-initiated vault transfer (manual mode): checking → savings only. */

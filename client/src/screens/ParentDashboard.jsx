@@ -196,7 +196,7 @@ function PendingTab({ client, notify }) {
         <div key={`c${c.id}`} className="pending-item">
           <span className="who">{c.kid_name}</span>
           <span className="what">
-            {c.icon} {c.title} <strong>(+{c.point_value})</strong>
+            {c.is_bonus ? '✨ ' : ''}{c.icon} {c.title} <strong>(+{c.point_value})</strong>
             <br />
             <small>{new Date(c.completed_at).toLocaleTimeString()}</small>
           </span>
@@ -242,7 +242,7 @@ function PendingTab({ client, notify }) {
 
 // ---------- Task management ----------
 
-const EMPTY_TASK = { title: '', category: 'morning', point_value: 1, icon: '⭐', kid_id: null };
+const EMPTY_TASK = { title: '', category: 'morning', point_value: 1, icon: '⭐', kid_id: null, is_bonus: 0 };
 
 function TasksTab({ client, notify }) {
   const [tasks, setTasks] = useState(null);
@@ -298,7 +298,7 @@ function TasksTab({ client, notify }) {
             {tasks.map((t) => (
               <tr key={t.id} className={t.active ? '' : 'inactive'}>
                 <td>
-                  {t.icon} {t.title}
+                  {t.is_bonus ? '✨ ' : ''}{t.icon} {t.title}
                 </td>
                 <td>{CATEGORIES.find(([k]) => k === t.category)?.[1]}</td>
                 <td>{t.point_value}</td>
@@ -364,6 +364,16 @@ function TaskForm({ task, kids, onSave, onClose }) {
               </option>
             ))}
           </select>
+        </label>
+        <label style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          <input
+            type="checkbox"
+            checked={!!form.is_bonus}
+            onChange={(e) => setForm({ ...form, is_bonus: e.target.checked ? 1 : 0 })}
+            style={{ width: 22, height: 22 }}
+          />
+          ✨ Mystery bonus task — hidden from the daily list; appears randomly as the
+          mystery challenge
         </label>
       </div>
       <div className="modal-actions">

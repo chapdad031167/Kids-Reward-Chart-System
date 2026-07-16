@@ -30,6 +30,17 @@ const SEED_TASKS = [
   { title: 'Listen and cooperate on the first ask', category: 'social_school', points: 2, icon: '👂' },
 ];
 
+// Mystery bonus pool — bigger, more involved tasks that appear as the
+// random "mystery challenge". Higher point values than daily routines.
+const SEED_BONUS_TASKS = [
+  { title: 'Help make dinner from start to finish', category: 'chores', points: 4, icon: '👨‍🍳' },
+  { title: 'Wash the car with a grown-up', category: 'chores', points: 5, icon: '🚗' },
+  { title: 'Clean out the toy bin and pick 3 toys to donate', category: 'personal_space', points: 5, icon: '📦' },
+  { title: 'Read a book out loud to someone', category: 'social_school', points: 3, icon: '📖' },
+  { title: 'Yard duty: 15 minutes of weeding or raking', category: 'chores', points: 4, icon: '🍂' },
+  { title: 'Secret kindness mission: do something nice without being asked', category: 'social_school', points: 4, icon: '💝' },
+];
+
 const SEED_REWARDS = [
   { title: '30 minutes of extra screen time', cost: 10, bucket: 'checking', icon: '📺' },
   { title: 'Pick what we have for dinner', cost: 15, bucket: 'checking', icon: '🍕' },
@@ -38,6 +49,24 @@ const SEED_REWARDS = [
   { title: 'One-on-one outing with a parent', cost: 40, bucket: 'savings', icon: '🚗' },
   { title: 'Small toy or book (under $10)', cost: 60, bucket: 'savings', icon: '🎁' },
 ];
+
+/**
+ * Runs on every boot: gives databases created before the mystery-task
+ * feature a starter bonus pool. No-op once any bonus task exists.
+ */
+export function ensureBonusPool() {
+  const count = db.prepare(`SELECT COUNT(*) AS n FROM tasks WHERE is_bonus = 1`).get().n;
+  if (count > 0) return false;
+  const insert = db.prepare(
+    `INSERT INTO tasks (title, category, point_value, icon, active, kid_id, is_bonus)
+     VALUES (?, ?, ?, ?, 1, NULL, 1)`
+  );
+  const run = db.transaction(() => {
+    for (const t of SEED_BONUS_TASKS) insert.run(t.title, t.category, t.points, t.icon);
+  });
+  run();
+  return true;
+}
 
 export function seedIfEmpty() {
   const kidCount = db.prepare('SELECT COUNT(*) AS n FROM kids').get().n;

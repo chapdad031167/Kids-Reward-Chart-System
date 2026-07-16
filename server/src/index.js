@@ -3,7 +3,7 @@ import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { DB_PATH } from './db.js';
-import { seedIfEmpty } from './seed.js';
+import { seedIfEmpty, ensureBonusPool } from './seed.js';
 import { kiosk } from './routes/kiosk.js';
 import { parent } from './routes/parent.js';
 
@@ -11,6 +11,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT || 8090);
 
 seedIfEmpty();
+ensureBonusPool();
 
 const app = express();
 app.use(express.json());
