@@ -741,6 +741,7 @@ function KidsTab({ client, notify }) {
   const [awarding, setAwarding] = useState(false);
   const [familyGoal, setFamilyGoalState] = useState(null);
   const [editingFamilyGoal, setEditingFamilyGoal] = useState(false);
+  const [digestPreview, setDigestPreview] = useState(null);
 
   const load = useCallback(() => {
     client.get('/api/parent/kids').then(setKids).catch(() => notify('Failed to load kids'));
@@ -804,7 +805,42 @@ function KidsTab({ client, notify }) {
           👨‍👩‍👦‍👦 Family goal
           {familyGoal ? `: ${familyGoal.progress}/${familyGoal.target}${familyGoal.reached ? ' 🎉' : ''}` : ': none'}
         </button>
+        <button
+          className="btn secondary"
+          onClick={async () => {
+            const d = await client.get('/api/parent/digest').catch(() => null);
+            if (d) setDigestPreview(d.text);
+          }}
+        >
+          📊 Weekly digest
+        </button>
       </div>
+
+      {digestPreview !== null && (
+        <Modal title="📊 Weekly digest" onClose={() => setDigestPreview(null)}>
+          <pre style={{ whiteSpace: 'pre-wrap', fontFamily: 'inherit', fontSize: 14, lineHeight: 1.5 }}>
+            {digestPreview}
+          </pre>
+          <p style={{ fontSize: 13, color: '#4a5568' }}>
+            Sends automatically every Sunday at 6pm when ntfy is configured.
+          </p>
+          <div className="modal-actions">
+            <button className="btn secondary" onClick={() => setDigestPreview(null)}>
+              Close
+            </button>
+            <button
+              className="btn primary"
+              onClick={async () => {
+                await client.post('/api/parent/digest').catch(() => {});
+                notify('Digest sent to ntfy (if configured)');
+                setDigestPreview(null);
+              }}
+            >
+              Send to my phone now
+            </button>
+          </div>
+        </Modal>
+      )}
 
       {editingFamilyGoal && (
         <FamilyGoalModal

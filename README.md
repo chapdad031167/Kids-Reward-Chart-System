@@ -85,6 +85,11 @@ the secret-code gate chimes or bonks, and finishing every task triggers a full f
 🔊/🔇 button on the kid home screen mutes the whole kiosk (persists per device; recipes live
 in `client/src/sounds.js`).
 
+**Weekly digest**: every Sunday at 6pm (container time) a summary is pushed via ntfy —
+points and tasks per kid, live streaks, new badges, the most-skipped tasks (your signal for
+which chores are mispriced), and anything waiting for approval. Preview or send it anytime
+from Kids & Vaults → 📊 Weekly digest.
+
 **Notifications (optional)**: set `NTFY_URL` to an ntfy topic URL and the app pushes a
 notification whenever a kid taps a task or requests a reward, so you can approve from your
 phone without watching the queue. Unset = disabled; a down ntfy server never blocks the app.

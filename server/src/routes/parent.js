@@ -18,6 +18,7 @@ import { vacationState, setVacation } from '../vacation.js';
 import { listBackups, runBackup } from '../backup.js';
 import { checkBadges } from '../badges.js';
 import { getFamilyGoal, setFamilyGoal } from '../familyGoal.js';
+import { buildDigest, sendDigest } from '../digest.js';
 
 const PARENT_PIN = process.env.PARENT_PIN || '1234';
 
@@ -142,6 +143,16 @@ parent.post('/undo', (req, res) => {
   const result = undoLastAction();
   if (!result.ok) return res.status(400).json({ error: result.reason });
   res.json(result);
+});
+
+// ---- Weekly digest ----
+
+parent.get('/digest', (req, res) => {
+  res.json({ text: buildDigest() });
+});
+
+parent.post('/digest', (req, res) => {
+  res.json({ ok: true, text: sendDigest() });
 });
 
 // ---- Backups ----
