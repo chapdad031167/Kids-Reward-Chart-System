@@ -42,6 +42,17 @@ the pool in the Tasks tab: any task with the ✨ *Mystery bonus task* checkbox i
 the daily list and enters the mystery rotation. The day schedule and task pick are
 deterministic per (kid, date), so restarts and multiple devices always agree.
 
+**Task scheduling**: every task can be limited to specific days of the week (day chips in
+the task form — e.g. "Pack backpack" on school nights only, trash duty on Tuesdays). Kids
+only see tasks scheduled for today, and streaks count only expected days: a weekdays-only
+task completed Friday and Monday is a continuous streak, and a Sunday-only task can't
+"break" midweek.
+
+**Backups**: a consistent SQLite snapshot is written to `<data>/backups/` on every boot and
+nightly at 3:15am (container time), keeping the last 14 (`BACKUP_KEEP` to change). The
+parent dashboard (Kids & Vaults) shows the latest backup and has a "Back up now" button.
+Restore = stop the container, replace `reward-chart.db` with a backup file, start.
+
 **Vacation mode**: the 🏖️ toggle in the parent dashboard pauses the whole household for
 travel or school breaks. Kids see a friendly themed "on break" screen instead of their task
 list (points and the reward shop stay available), no completions or mystery challenges
@@ -114,6 +125,7 @@ the tablet's home screen in kiosk/fullscreen mode for the best experience.
 | `TZ`         | `America/New_York` | Local timezone for daily reset and streaks     |
 | `DATA_DIR`   | `/data`            | Where the SQLite file lives (mount a volume)   |
 | `NTFY_URL`   | *(unset)*          | ntfy topic URL for parent push notifications; unset disables |
+| `BACKUP_KEEP`| `14`               | How many nightly database backups to retain               |
 
 ### Persistence & backup
 

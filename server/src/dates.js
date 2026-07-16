@@ -22,3 +22,8 @@ export function nextDay(dateStr) {
 export function nowIso() {
   return new Date().toISOString();
 }
+
+/** Day of week (0=Sunday … 6=Saturday) for a YYYY-MM-DD string. */
+export function dayOfWeek(dateStr) {
+  return new Date(dateStr + 'T12:00:00Z').getUTCDay();
+}

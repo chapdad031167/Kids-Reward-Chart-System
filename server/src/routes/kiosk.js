@@ -5,6 +5,7 @@ import { expireStalePending, displayStreak, transferPoints } from '../service.js
 import { notifyParent } from '../notify.js';
 import { getBonusForToday, revealBonus } from '../bonus.js';
 import { vacationState } from '../vacation.js';
+import { isScheduledOn } from '../schedule.js';
 
 export const kiosk = Router();
 
@@ -33,20 +34,21 @@ kiosk.get('/kids/:id/today', (req, res) => {
 
   const tasks = db
     .prepare(
-      `SELECT t.id, t.title, t.category_id, t.point_value, t.icon,
+      `SELECT t.id, t.title, t.category_id, t.point_value, t.icon, t.days,
               c.id AS completion_id, c.status
        FROM tasks t
        LEFT JOIN completions c ON c.task_id = t.id AND c.kid_id = ? AND c.date = ?
        WHERE t.active = 1 AND t.is_bonus = 0 AND (t.kid_id IS NULL OR t.kid_id = ?)
        ORDER BY t.category_id, t.id`
     )
-    .all(kid.id, today, kid.id);
+    .all(kid.id, today, kid.id)
+    .filter((t) => isScheduledOn(t.days, today));
 
   const categories = db.prepare(`SELECT * FROM categories ORDER BY position, id`).all();
 
   const streakRows = db.prepare(`SELECT * FROM streaks WHERE kid_id = ?`).all(kid.id);
   const streaksByTask = new Map(streakRows.map((s) => [s.task_id, s]));
-  for (const t of tasks) t.streak = displayStreak(streaksByTask.get(t.id));
+  for (const t of tasks) t.streak = displayStreak(streaksByTask.get(t.id), t.days);
 
   const bonus = getBonusForToday(kid.id);
 
@@ -104,6 +106,9 @@ kiosk.post('/completions', (req, res) => {
   }
 
   const today = todayStr();
+  if (!task.is_bonus && !isScheduledOn(task.days, today)) {
+    return res.status(400).json({ error: 'not_scheduled_today' });
+  }
   const existing = db
     .prepare(`SELECT * FROM completions WHERE task_id = ? AND kid_id = ? AND date = ?`)
     .get(task_id, kid_id, today);

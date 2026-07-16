@@ -5,6 +5,41 @@ import { Modal, Toast } from '../components/ui.jsx';
 import EmojiPicker from '../components/EmojiPicker.jsx';
 import { CodePicker, CODE_LENGTH, CODE_EMOJIS } from '../components/KidCode.jsx';
 
+const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+function scheduleSummary(days) {
+  if (!days) return 'Every day';
+  if (days === '12345') return 'Weekdays';
+  if (days === '06') return 'Weekends';
+  return days.split('').sort().map((d) => DAY_LABELS[Number(d)]).join(', ');
+}
+
+/** Day-of-week chips; null = every day, at least one day always selected. */
+function DayPicker({ value, onChange }) {
+  const selected = value == null ? new Set(['0', '1', '2', '3', '4', '5', '6']) : new Set(value.split(''));
+  function toggle(d) {
+    const next = new Set(selected);
+    if (next.has(d)) next.delete(d);
+    else next.add(d);
+    if (next.size === 0) return;
+    onChange(next.size === 7 ? null : [...next].sort().join(''));
+  }
+  return (
+    <div className="day-chips">
+      {DAY_LABELS.map((label, i) => (
+        <button
+          type="button"
+          key={label}
+          className={`day-chip${selected.has(String(i)) ? ' on' : ''}`}
+          onClick={() => toggle(String(i))}
+        >
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export default function ParentDashboard() {
   const [pin, setPin] = useState(() => sessionStorage.getItem('parent-pin') || null);
   if (!pin) {
@@ -332,7 +367,7 @@ function TasksTab({ client, notify }) {
       <div style={{ display: 'flex', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
         <button
           className="btn primary"
-          onClick={() => setEditing({ title: '', category_id: categories[0]?.id ?? 1, point_value: 1, icon: '⭐', kid_id: null, is_bonus: 0 })}
+          onClick={() => setEditing({ title: '', category_id: categories[0]?.id ?? 1, point_value: 1, icon: '⭐', kid_id: null, is_bonus: 0, days: null })}
         >
           ➕ Add Task
         </button>
@@ -346,6 +381,7 @@ function TasksTab({ client, notify }) {
             <tr>
               <th>Task</th>
               <th>Category</th>
+              <th>When</th>
               <th>Pts</th>
               <th>Who</th>
               <th></th>
@@ -359,6 +395,7 @@ function TasksTab({ client, notify }) {
                   {t.is_bonus ? '✨ ' : ''}{t.icon} {t.title}
                 </td>
                 <td>{categories.find((c) => c.id === t.category_id)?.label || '—'}</td>
+                <td>{t.is_bonus ? '✨ Mystery' : scheduleSummary(t.days)}</td>
                 <td>{t.point_value}</td>
                 <td>{t.kid_id ? kids.find((k) => k.id === t.kid_id)?.name || t.kid_id : 'Both'}</td>
                 <td>
@@ -496,6 +533,12 @@ function TaskForm({ task, kids, categories, onSave, onClose }) {
           Icon
           <EmojiPicker value={form.icon} onChange={(icon) => setForm({ ...form, icon })} />
         </label>
+        {!form.is_bonus && (
+          <label>
+            Which days? ({scheduleSummary(form.days)})
+            <DayPicker value={form.days} onChange={(days) => setForm({ ...form, days })} />
+          </label>
+        )}
         <label>
           Applies to
           <select value={form.kid_id ?? ''} onChange={(e) => setForm({ ...form, kid_id: e.target.value || null })}>
@@ -673,9 +716,11 @@ function KidsTab({ client, notify }) {
   const [adjusting, setAdjusting] = useState(null); // kid
   const [resetting, setResetting] = useState(null); // kid
   const [settingCode, setSettingCode] = useState(null); // kid
+  const [backups, setBackups] = useState([]);
 
   const load = useCallback(() => {
     client.get('/api/parent/kids').then(setKids).catch(() => notify('Failed to load kids'));
+    client.get('/api/parent/backups').then(setBackups).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -821,6 +866,33 @@ function KidsTab({ client, notify }) {
       {history && (
         <HistoryModal history={history} onClose={() => setHistory(null)} />
       )}
+
+      <div className="pending-item" style={{ alignItems: 'flex-start', marginTop: 18 }}>
+        <span style={{ fontSize: 28 }}>💾</span>
+        <span className="what">
+          <strong>Backups</strong> — automatic nightly snapshot at 3:15am (kept:{' '}
+          {backups.length}); stored in the data folder alongside the database.
+          <div style={{ marginTop: 6, fontSize: 13, color: '#4a5568' }}>
+            {backups.length === 0
+              ? 'No backups yet — the first one is written on boot.'
+              : `Latest: ${backups[0].file} (${Math.round(backups[0].size / 1024)} KB)`}
+          </div>
+        </span>
+        <button
+          className="btn secondary"
+          onClick={async () => {
+            try {
+              const r = await client.post('/api/parent/backups');
+              notify(`Backup written: ${r.file}`);
+            } catch {
+              notify('Backup failed — check server logs');
+            }
+            load();
+          }}
+        >
+          Back up now
+        </button>
+      </div>
     </div>
   );
 }

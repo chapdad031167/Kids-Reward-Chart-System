@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { DB_PATH } from './db.js';
 import { seedIfEmpty, ensureBonusPool } from './seed.js';
+import { scheduleBackups } from './backup.js';
 import { kiosk } from './routes/kiosk.js';
 import { parent } from './routes/parent.js';
 
@@ -12,6 +13,7 @@ const PORT = Number(process.env.PORT || 8090);
 
 seedIfEmpty();
 ensureBonusPool();
+scheduleBackups();
 
 const app = express();
 app.use(express.json());

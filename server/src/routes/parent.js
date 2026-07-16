@@ -14,6 +14,7 @@ import {
   adjustBalance,
 } from '../service.js';
 import { vacationState, setVacation } from '../vacation.js';
+import { listBackups, runBackup } from '../backup.js';
 
 const PARENT_PIN = process.env.PARENT_PIN || '1234';
 
@@ -91,6 +92,21 @@ parent.post('/undo', (req, res) => {
   res.json(result);
 });
 
+// ---- Backups ----
+
+parent.get('/backups', (req, res) => {
+  res.json(listBackups());
+});
+
+parent.post('/backups', async (req, res) => {
+  try {
+    const file = await runBackup();
+    res.json({ ok: true, file });
+  } catch (err) {
+    res.status(500).json({ error: 'backup_failed', message: err.message });
+  }
+});
+
 // ---- Vacation mode ----
 
 parent.get('/vacation', (req, res) => {
@@ -149,19 +165,20 @@ function validTaskBody(body) {
     body.title.trim().length > 0 &&
     db.prepare(`SELECT id FROM categories WHERE id = ?`).get(body.category_id) !== undefined &&
     Number.isInteger(body.point_value) &&
-    body.point_value > 0
+    body.point_value > 0 &&
+    (body.days == null || /^[0-6]{1,7}$/.test(body.days))
   );
 }
 
 parent.post('/tasks', (req, res) => {
   if (!validTaskBody(req.body)) return res.status(400).json({ error: 'invalid_task' });
-  const { title, category_id, point_value, icon, kid_id, is_bonus } = req.body;
+  const { title, category_id, point_value, icon, kid_id, is_bonus, days } = req.body;
   const info = db
     .prepare(
-      `INSERT INTO tasks (title, category_id, point_value, icon, active, kid_id, is_bonus)
-       VALUES (?, ?, ?, ?, 1, ?, ?)`
+      `INSERT INTO tasks (title, category_id, point_value, icon, active, kid_id, is_bonus, days)
+       VALUES (?, ?, ?, ?, 1, ?, ?, ?)`
     )
-    .run(title.trim(), category_id, point_value, icon || '⭐', kid_id || null, is_bonus ? 1 : 0);
+    .run(title.trim(), category_id, point_value, icon || '⭐', kid_id || null, is_bonus ? 1 : 0, days || null);
   res.status(201).json(db.prepare(`SELECT * FROM tasks WHERE id = ?`).get(info.lastInsertRowid));
 });
 
@@ -176,11 +193,12 @@ parent.patch('/tasks/:id', (req, res) => {
     active: req.body.active !== undefined ? (req.body.active ? 1 : 0) : task.active,
     kid_id: req.body.kid_id !== undefined ? req.body.kid_id : task.kid_id,
     is_bonus: req.body.is_bonus !== undefined ? (req.body.is_bonus ? 1 : 0) : task.is_bonus,
+    days: req.body.days !== undefined ? req.body.days || null : task.days,
   };
   if (!validTaskBody(merged)) return res.status(400).json({ error: 'invalid_task' });
   db.prepare(
-    `UPDATE tasks SET title = ?, category_id = ?, point_value = ?, icon = ?, active = ?, kid_id = ?, is_bonus = ? WHERE id = ?`
-  ).run(merged.title.trim(), merged.category_id, merged.point_value, merged.icon, merged.active, merged.kid_id, merged.is_bonus, task.id);
+    `UPDATE tasks SET title = ?, category_id = ?, point_value = ?, icon = ?, active = ?, kid_id = ?, is_bonus = ?, days = ? WHERE id = ?`
+  ).run(merged.title.trim(), merged.category_id, merged.point_value, merged.icon, merged.active, merged.kid_id, merged.is_bonus, merged.days, task.id);
   res.json(db.prepare(`SELECT * FROM tasks WHERE id = ?`).get(task.id));
 });
 

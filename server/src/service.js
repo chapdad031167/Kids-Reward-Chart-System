@@ -1,6 +1,6 @@
 import { db, balances } from './db.js';
 import { todayStr, prevDay, nowIso } from './dates.js';
-import { prevActiveDay } from './vacation.js';
+import { prevExpectedDay } from './schedule.js';
 
 /**
  * Lazy daily housekeeping: pending completions from prior days expire.
@@ -15,13 +15,17 @@ export function expireStalePending() {
 
 /**
  * The streak a kid should currently see for a task. A streak is alive if
- * its last approved day is today or the most recent non-vacation day —
- * vacation days never count as "missed".
+ * its last approved day is today or the most recent day the task was
+ * actually expected — vacation days and unscheduled days never count as
+ * "missed".
  */
-export function displayStreak(streakRow) {
+export function displayStreak(streakRow, taskDays = null) {
   if (!streakRow || !streakRow.last_completed_date) return 0;
   const today = todayStr();
-  if (streakRow.last_completed_date === today || streakRow.last_completed_date >= prevActiveDay(today)) {
+  if (
+    streakRow.last_completed_date === today ||
+    streakRow.last_completed_date >= prevExpectedDay(taskDays, today)
+  ) {
     return streakRow.current_streak;
   }
   return 0;
@@ -87,9 +91,9 @@ function approveCompletionInner(completionId) {
   } else if (
     prevStreak &&
     prevStreak.last_completed_date &&
-    prevStreak.last_completed_date >= prevActiveDay(completion.date)
+    prevStreak.last_completed_date >= prevExpectedDay(task.days, completion.date)
   ) {
-    // Chain continues across any run of vacation days in between.
+    // Chain continues across vacation days and unscheduled days.
     current = prevStreak.current_streak + 1;
   }
   const longest = Math.max(current, prevStreak ? prevStreak.longest_streak : 0);
@@ -226,6 +230,7 @@ export const undoLastAction = db.transaction(() => {
  * snapshot approach can't apply.
  */
 export function recomputeStreak(taskId, kidId) {
+  const taskDays = db.prepare(`SELECT days FROM tasks WHERE id = ?`).get(taskId)?.days ?? null;
   const rows = db
     .prepare(
       `SELECT date FROM completions
@@ -242,7 +247,7 @@ export function recomputeStreak(taskId, kidId) {
   let longest = 0;
   let prev = null;
   for (const { date } of rows) {
-    chain = prev !== null && prev >= prevActiveDay(date) ? chain + 1 : 1;
+    chain = prev !== null && prev >= prevExpectedDay(taskDays, date) ? chain + 1 : 1;
     if (chain > longest) longest = chain;
     prev = date;
   }

@@ -284,6 +284,31 @@ button {
   background: #c6f6d5;
 }
 
+/* ---------- Day picker ---------- */
+
+.day-chips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.day-chip {
+  min-width: 52px;
+  min-height: 44px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 700;
+  background: #edf2f7;
+  color: #718096;
+  border: 2px solid transparent;
+}
+
+.day-chip.on {
+  background: #c6f6d5;
+  color: #22543d;
+  border-color: #2e9e56;
+}
+
 /* ---------- Category manager ---------- */
 
 .category-row {

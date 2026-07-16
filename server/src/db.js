@@ -41,7 +41,8 @@ CREATE TABLE IF NOT EXISTS tasks (
   icon TEXT NOT NULL DEFAULT '⭐',
   active INTEGER NOT NULL DEFAULT 1,
   kid_id INTEGER REFERENCES kids(id),
-  is_bonus INTEGER NOT NULL DEFAULT 0
+  is_bonus INTEGER NOT NULL DEFAULT 0,
+  days TEXT
 );
 
 CREATE TABLE IF NOT EXISTS completions (
@@ -174,6 +175,13 @@ if (taskColumns.includes('category')) {
     `);
   })();
   db.pragma('foreign_keys = ON');
+}
+
+// Task day-of-week schedules (v1.1); NULL = every day. Runs after the
+// category rebuild so the column lands on the final table shape.
+taskColumns = db.prepare(`PRAGMA table_info(tasks)`).all().map((c) => c.name);
+if (!taskColumns.includes('days')) {
+  db.exec(`ALTER TABLE tasks ADD COLUMN days TEXT`);
 }
 
 /** Current point balances per bucket for a kid. */
