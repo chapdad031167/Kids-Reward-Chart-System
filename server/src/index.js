@@ -32,9 +32,22 @@ const staticDir =
     (dir) => fs.existsSync(path.join(dir, 'index.html'))
   );
 if (staticDir && fs.existsSync(staticDir)) {
-  app.use(express.static(staticDir));
+  // index.html must always revalidate so phones pick up new releases;
+  // hashed bundle files are immutable and can cache forever.
+  app.use(
+    express.static(staticDir, {
+      setHeaders: (res, filePath) => {
+        if (filePath.endsWith('.html')) {
+          res.setHeader('Cache-Control', 'no-cache');
+        } else if (filePath.includes(`${path.sep}assets${path.sep}`)) {
+          res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+        }
+      },
+    })
+  );
   app.get('*', (req, res, next) => {
     if (req.path.startsWith('/api/')) return next();
+    res.setHeader('Cache-Control', 'no-cache');
     res.sendFile(path.join(staticDir, 'index.html'));
   });
 }
