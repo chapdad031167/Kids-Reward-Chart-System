@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { api, tapTask, queuedTapCount, startQueueSync } from '../api.js';
 import { THEMES } from '../themes.js';
 import { useIdleTimer } from '../hooks.js';
+import { playSound, isMuted, setMuted } from '../sounds.js';
 import Celebration from '../components/Celebration.jsx';
 import ProgressMeter from '../components/ProgressMeter.jsx';
 import { Modal, Toast } from '../components/ui.jsx';
@@ -18,7 +19,9 @@ export default function KidHome() {
   const [showTransfer, setShowTransfer] = useState(false);
   const [easterEgg, setEasterEgg] = useState(false);
   const [revealing, setRevealing] = useState(false);
+  const [muted, setMutedState] = useState(isMuted);
   const mascotTaps = useRef([]);
+  const wasComplete = useRef(null);
 
   // Kiosk behavior: bounce back to the avatar screen after 90s idle.
   useIdleTimer(() => navigate('/'), 90000);
@@ -42,6 +45,19 @@ export default function KidHome() {
       stopSync();
     };
   }, [refresh]);
+
+  // Day-complete fanfare: fires once when the last task flips to done
+  // (not on initial load of an already-finished day).
+  useEffect(() => {
+    if (!data) return;
+    const complete = data.progress.totalTasks > 0 && data.progress.doneCount >= data.progress.totalTasks;
+    if (wasComplete.current === null) {
+      wasComplete.current = complete;
+      return;
+    }
+    if (complete && !wasComplete.current) playSound('fanfare');
+    wasComplete.current = complete;
+  }, [data]);
 
   // Kid-lock guard: a kid with a secret code must come through the
   // avatar-screen gate, which stamps this session flag.
@@ -90,6 +106,7 @@ export default function KidHome() {
     setRevealing(true);
     try {
       const state = await api.post(`/api/kids/${kidId}/bonus/reveal`);
+      playSound('sparkle');
       // let the wobble animation play before the reveal swap
       setTimeout(() => {
         setData((d) => ({ ...d, bonus: state }));
@@ -143,6 +160,18 @@ export default function KidHome() {
         <h1>Hi, {data.kid.name}!</h1>
         <button className="home-btn" onClick={() => setShowRewards(true)}>
           🎁 {theme.terms.rewards}
+        </button>
+        <button
+          className="home-btn"
+          aria-label={muted ? 'Turn sounds on' : 'Turn sounds off'}
+          onClick={() => {
+            const next = !muted;
+            setMuted(next);
+            setMutedState(next);
+            if (!next) playSound('ding');
+          }}
+        >
+          {muted ? '🔇' : '🔊'}
         </button>
         <button className="home-btn" onClick={() => navigate('/')}>
           ⬅ Back
@@ -306,6 +335,7 @@ function RewardsModal({ kidId, theme, onClose }) {
   async function requestReward(reward) {
     try {
       await api.post('/api/redemptions', { kid_id: kidId, reward_id: reward.id });
+      playSound('ding');
       setToast('Sent to a grown-up to approve! ⏳');
       setConfirming(null);
       load();

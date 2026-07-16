@@ -42,6 +42,13 @@ the pool in the Tasks tab: any task with the ✨ *Mystery bonus task* checkbox i
 the daily list and enters the mystery rotation. The day schedule and task pick are
 deterministic per (kid, date), so restarts and multiple devices always agree.
 
+**Sounds**: every sound is synthesized in the browser with the Web Audio API — no audio
+files, works offline. Task celebrations play a themed jingle (ref's whistle + fanfare for
+soccer, egg-crack + friendly roar for dino), mystery reveals shimmer, reward requests ding,
+the secret-code gate chimes or bonks, and finishing every task triggers a full fanfare. The
+🔊/🔇 button on the kid home screen mutes the whole kiosk (persists per device; recipes live
+in `client/src/sounds.js`).
+
 **Notifications (optional)**: set `NTFY_URL` to an ntfy topic URL and the app pushes a
 notification whenever a kid taps a task or requests a reward, so you can approve from your
 phone without watching the queue. Unset = disabled; a down ntfy server never blocks the app.
@@ -141,5 +148,3 @@ Dockerfile         multi-stage build: Vite build → static files served by Expr
   practical (travel, school breaks): pause the daily task list and freeze streaks so they
   resume where they left off instead of breaking.
 - **Multi-household or external/cloud accounts** — the app stays LAN-only.
-- **Audio/sound effects** — celebrations are visual-only by design so sound can be layered
-  in later without rework (trigger point is marked in `Celebration.jsx`).

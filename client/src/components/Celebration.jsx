@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { playSound } from '../sounds.js';
 
 const CONFETTI_COLORS = ['#f5c518', '#ffffff', '#2e9e56', '#f59e0b', '#63b3ed', '#f687b3'];
 
@@ -20,14 +21,13 @@ function Confetti() {
   );
 }
 
-/**
- * Full-screen, sound-free celebration. Visual-only by design so audio can
- * be layered in later (add a sound trigger where onDone is armed).
- */
+/** Full-screen celebration: themed animation plus a themed jingle. */
 export default function Celebration({ theme, onDone }) {
   useEffect(() => {
+    playSound(theme.sound);
     const t = setTimeout(onDone, 2200);
     return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [onDone]);
 
   return (

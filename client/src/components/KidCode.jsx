@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { api } from '../api.js';
+import { playSound } from '../sounds.js';
 
 /**
  * The nine emoji every secret code is built from. The kid's unlock grid
@@ -36,7 +37,11 @@ export function KidCodeGate({ kid, onUnlocked, onCancel }) {
     const result = await api
       .post(`/api/kids/${kid.id}/verify-code`, { code: next.join('') })
       .catch(() => ({ ok: false }));
-    if (result.ok) return onUnlocked();
+    if (result.ok) {
+      playSound('unlock');
+      return onUnlocked();
+    }
+    playSound('bonk');
     setShaking(true);
     setTimeout(() => {
       setEntered([]);

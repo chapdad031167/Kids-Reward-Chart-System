@@ -39,6 +39,7 @@ export const THEMES = {
       mystery: '🏆',
     },
     celebration: 'soccer',
+    sound: 'goal',
     progressStyle: 'bar',
   },
   dino: {
@@ -76,6 +77,7 @@ export const THEMES = {
       mystery: '🥚',
     },
     celebration: 'dino',
+    sound: 'roar',
     progressStyle: 'egg',
   },
 };
