@@ -1,5 +1,6 @@
 import { db } from './db.js';
 import { todayStr, prevDay, nextDay } from './dates.js';
+import { getSetting, setSetting } from './settings.js';
 
 /**
  * Vacation mode: a household-wide pause. While on, the daily task list is
@@ -11,16 +12,8 @@ import { todayStr, prevDay, nextDay } from './dates.js';
  * so streak math keeps skipping them forever after.
  */
 
-export function getSetting(key) {
-  return db.prepare(`SELECT value FROM settings WHERE key = ?`).get(key)?.value ?? null;
-}
-
-export function setSetting(key, value) {
-  db.prepare(
-    `INSERT INTO settings (key, value) VALUES (?, ?)
-     ON CONFLICT (key) DO UPDATE SET value = excluded.value`
-  ).run(key, value);
-}
+// Re-exported for existing importers (service.js, familyGoal.js).
+export { getSetting, setSetting };
 
 export function vacationState() {
   const on = getSetting('vacation_mode') === '1';

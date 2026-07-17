@@ -8,8 +8,56 @@ import { vacationState } from '../vacation.js';
 import { isScheduledOn } from '../schedule.js';
 import { checkBadges, badgeState, markBadgesSeen, levelFor } from '../badges.js';
 import { getFamilyGoal } from '../familyGoal.js';
+import { isConfigured, markConfigured, getAppName, setAppName, setPin } from '../config.js';
+import { seedStarterContent } from '../seed.js';
+
+const THEMES = ['soccer', 'dino', 'space', 'fantasy', 'racing'];
+const DEFAULT_AVATARS = { soccer: '⚽', dino: '🦖', space: '🚀', fantasy: '🦄', racing: '🏎️' };
 
 export const kiosk = Router();
+
+/** Public: does this instance still need first-run setup, and its name. */
+kiosk.get('/setup-status', (req, res) => {
+  res.json({ configured: isConfigured(), appName: getAppName() });
+});
+
+/**
+ * Public first-run setup — only usable while unconfigured. Names the app,
+ * sets the parent PIN, creates the first kid, and optionally loads the
+ * starter task/reward library. Locks itself once configured.
+ */
+kiosk.post('/setup', (req, res) => {
+  if (isConfigured()) return res.status(403).json({ error: 'already_configured' });
+  const { app_name, pin, kid, load_starter } = req.body || {};
+  if (typeof app_name !== 'string' || app_name.trim().length === 0) {
+    return res.status(400).json({ error: 'invalid_app_name' });
+  }
+  if (!/^\d{4}$/.test(String(pin ?? ''))) {
+    return res.status(400).json({ error: 'invalid_pin' });
+  }
+  if (
+    !kid ||
+    typeof kid.name !== 'string' ||
+    kid.name.trim().length === 0 ||
+    !Number.isInteger(kid.age) ||
+    kid.age < 1 ||
+    kid.age > 18 ||
+    !THEMES.includes(kid.theme)
+  ) {
+    return res.status(400).json({ error: 'invalid_kid' });
+  }
+
+  db.prepare(
+    `INSERT INTO kids (name, avatar_icon, theme, age, vault_mode, auto_split_ratio)
+     VALUES (?, ?, ?, ?, 'manual', 0.7)`
+  ).run(kid.name.trim(), kid.avatar_icon || DEFAULT_AVATARS[kid.theme], kid.theme, kid.age);
+
+  setAppName(app_name);
+  setPin(String(pin));
+  if (load_starter) seedStarterContent();
+  markConfigured();
+  res.json({ ok: true });
+});
 
 kiosk.get('/kids', (req, res) => {
   const kids = db

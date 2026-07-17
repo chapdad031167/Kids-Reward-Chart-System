@@ -3,7 +3,8 @@ import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { DB_PATH } from './db.js';
-import { seedIfEmpty, ensureBonusPool } from './seed.js';
+import { ensureBonusPool } from './seed.js';
+import { isConfigured } from './config.js';
 import { scheduleBackups } from './backup.js';
 import { scheduleDigest } from './digest.js';
 import { kiosk } from './routes/kiosk.js';
@@ -12,8 +13,9 @@ import { parent } from './routes/parent.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT || 8090);
 
-seedIfEmpty();
-ensureBonusPool();
+// Fresh installs configure themselves through the first-run setup wizard.
+// Existing installs get the mystery bonus pool backfilled if they predate it.
+if (isConfigured()) ensureBonusPool();
 scheduleBackups();
 scheduleDigest();
 

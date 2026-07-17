@@ -4,7 +4,7 @@ import { api } from '../api.js';
 import { useLongPress } from '../hooks.js';
 import { KidCodeGate } from '../components/KidCode.jsx';
 
-export default function AvatarSelect() {
+export default function AvatarSelect({ appName = 'Reward Chart' }) {
   const [kids, setKids] = useState([]);
   const [unlocking, setUnlocking] = useState(null); // kid awaiting secret code
   const navigate = useNavigate();
@@ -62,7 +62,7 @@ export default function AvatarSelect() {
       </button>
       {/* Long-press still works as a shortcut to the parent PIN screen. */}
       <div className="app-logo" {...logoPress}>
-        ⭐ Chapman Reward Chart
+        ⭐ {appName}
       </div>
     </div>
   );

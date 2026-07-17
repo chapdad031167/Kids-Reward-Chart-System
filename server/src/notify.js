@@ -1,6 +1,6 @@
 /**
  * Optional push notifications via ntfy (https://ntfy.sh or self-hosted).
- * Set NTFY_URL to the full topic URL (e.g. http://chappynas:8093/reward-chart)
+ * Set NTFY_URL to the full topic URL (e.g. http://your-server:8093/reward-chart)
  * to enable; leave unset to disable. Fire-and-forget — a down ntfy server
  * never blocks or fails the kid-facing flow.
  */

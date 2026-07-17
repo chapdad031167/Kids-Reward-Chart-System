@@ -1,201 +1,167 @@
-# Kids Reward Chart System
+# Reward Chart
 
-A self-hosted web app for tracking daily routines/chores and rewarding two kids with a points
-economy. Runs locally on a home NAS (Docker), accessed via a shared kiosk tablet plus a parent
-dashboard from any device on the home network. LAN-only — no cloud, no accounts.
+A self-hosted chore & reward system for families — a shared kiosk tablet the kids tap,
+and a PIN-protected dashboard the parents run it from. Each child gets their own themed
+world (soccer, dinosaur, space, fantasy, or racing) with its own colors, celebrations,
+sounds, and vocabulary. Runs entirely on your own hardware; your family's data never
+leaves the house.
 
-- **Aedan (8)** — ⚽ soccer theme: "GOAL!" celebrations, Match Progress bar, Win Streaks, Season Fund savings vault
-- **Ashton (6)** — 🦖 dino theme: "ROAR!" celebrations, an egg that cracks as tasks complete and hatches when the day is done, Fossil Streaks, Dino Nest Egg savings vault
+**[▶ Try the live demo](https://claude.ai/code/artifact/a01a6552-1d54-463d-9a77-dc4ee6ce7f07)** — a full in-browser build, parent PIN `1234`, add `?reset` to start over.
 
-## How it works
+<p align="center">
+  <img src="docs/screenshots/avatar-select.png" width="49%" alt="Avatar select screen with themed kids" />
+  <img src="docs/screenshots/kid-home.png" width="49%" alt="A kid's themed home screen" />
+</p>
+<p align="center">
+  <img src="docs/screenshots/parent-dashboard.png" width="49%" alt="Parent approval dashboard" />
+  <img src="docs/screenshots/setup-wizard.png" width="49%" alt="First-run setup wizard" />
+</p>
 
-**Kid kiosk** (`/`): the landing screen shows two big avatar buttons. Tapping one opens that
-kid's themed home screen — today's tasks grouped by category, a daily progress meter, streaks,
-points balances (Spending / Savings split), and a reward shop. Tapping a task marks it
-*pending* with an instant celebration animation; a parent approves it later. After 90 seconds
-of inactivity the kiosk returns to the avatar screen. Kids never see each other's progress —
-and each kid can optionally get a **secret emoji code** (set in Kids & Vaults): their avatar
-shows a 🔒, and opening their screen means tapping their 3 secret emoji in order on a
-9-emoji grid. Wrong code shakes and resets; returning to the avatar screen re-locks.
+## Why I built this
 
-**Task categories** are parent-editable (Tasks → Manage Categories): rename the defaults,
-change their icons, or add new ones (e.g. "Weekend Jobs") — kid screens regroup instantly.
-All icons across tasks, rewards, and categories are chosen from a curated kid-friendly emoji
-picker rather than free text.
+Sticker charts on the fridge don't scale past one kid, don't teach saving, and turn into
+a source of sibling comparison. I wanted something my kids would actually *want* to walk
+up and use, that let them earn toward things they cared about, and that I could approve
+from my phone without another cloud account holding my children's data. So I built it to
+run on the home server next to the rest of the self-hosted stack — one container, one
+SQLite file, no accounts, no internet required.
 
-**Parent dashboard** (the "👨‍👧‍👦 Parents" button on the avatar screen, `/parent`, or
-long-press the logo): protected by a 4-digit PIN (tap the pad or type on a keyboard). Approve/reject completions and reward
-requests (with Quick Approve All), undo the last approval (restores points *and* streaks),
-manage tasks and rewards, configure each kid's vault, and view per-kid history. Two
-correction tools live in Kids & Vaults for when a mistake slips past undo: **Adjust points**
-(directly add/remove from a vault, logged in the ledger) and **Reset today** (wipe a kid's
-day — clears today's completions, claws back today's points, and rewinds streaks as if the
-day hadn't been tapped).
+It's grown well past a sticker chart: a points economy with spending/saving vaults,
+streaks, random mystery challenges, achievement badges, per-child levels, and a
+cooperative family goal — but the core loop is still *tap a task → parent approves →
+points land → celebrate.*
 
-**Mystery challenges ("Fog of War")**: on pseudo-random days (~4 out of 7, different per
-kid), a glowing mystery object appears on the kid's home screen — a golden trophy box for
-the soccer theme, a mystery egg for the dino theme. Tapping it reveals a bonus task drawn
-from a parent-managed pool of bigger, higher-point challenges ("Wash the car with a
-grown-up", "Secret kindness mission", …). The revealed task completes and gets approved
-like any other, but doesn't count toward the daily progress meter — it's pure bonus. Manage
-the pool in the Tasks tab: any task with the ✨ *Mystery bonus task* checkbox is hidden from
-the daily list and enters the mystery rotation. The day schedule and task pick are
-deterministic per (kid, date), so restarts and multiple devices always agree.
+## Features
 
-**Kid management**: Kids & Vaults → ➕ Add kid (name, age, theme, avatar) — new kids
-automatically get every "Both kids" task. Five themes: ⚽ Soccer, 🦖 Dinosaur, 🚀 Space,
-🦄 Fantasy, 🏎️ Racing — each with its own palette, vocabulary (GOAL!/ROAR!/BLAST OFF!/
-TA-DA!/VROOM!), celebration animation, synthesized jingle, level titles, and vault names;
-any kid's theme can be switched anytime from their row. 🗑️ Remove kid permanently deletes a
-kid and all their data behind a type-their-name confirmation. 🏅 Clear trophy case wipes a
-kid's badges and their bonus points (threshold badges they still qualify for re-earn on
-next visit — it's a correction tool). **🔄 Fresh start** (bottom of the tab, type FRESH to
-confirm) wipes every kid's points, streaks, badges, and history — perfect after a testing
-period — while keeping kids, themes, secret codes, tasks, rewards, and categories; a safety
-backup is written automatically first.
+**For kids (the shared kiosk):**
+- Tap an avatar to enter your own themed home screen — no password (or an optional
+  3-emoji secret code so siblings can't open each other's).
+- Big, tappable tasks grouped by category; tapping one plays a themed celebration
+  (animation + synthesized sound) and queues it for a parent.
+- A daily progress meter, a two-vault points economy (spend now vs. save up), streaks,
+  a reward shop you browse and request from, and a savings goal you pick and watch fill.
+- **Mystery challenges** appear on random days — a glowing chest/egg/capsule that opens
+  to reveal a bigger bonus task.
+- **Badges, levels, and a cooperative family goal** for long-term motivation — kids only
+  ever see their own numbers and a shared team bar, never a head-to-head comparison.
+- After 90 seconds idle, the kiosk returns to the avatar screen on its own.
 
-**Badges, levels & family goal**: kids earn permanent badges (first points, 100/250/500
-lifetime, 3/7/14/30-day streaks — streak badges pay bonus points — mysteries solved, perfect
-day, super saver) with a full-screen celebration on earn and a themed trophy case (Trophy
-Case / Fossil Collection) showing earned + locked. Lifetime points translate to a level with
-themed titles (Rookie → Legend / Dino Egg → Dino Legend) shown by their name. Parents can
-also set a **family goal** — one shared target both kids fill together ("100 points → pizza
-night"); kids see only the combined bar, never each other's numbers.
+**For parents (the PIN-protected dashboard):**
+- An approval queue with one-tap approve/reject, Quick Approve All, and Undo.
+- Full management of tasks (with per-day-of-week schedules), categories, rewards, and
+  each child's vault rules — manual saving or automatic split.
+- Add/remove kids, switch a kid's theme, set secret codes, adjust balances, reset a day,
+  bonus awards, a "to deliver" list so approved rewards don't get forgotten, and a
+  fresh-start wipe (with an automatic safety backup).
+- **Vacation mode** pauses the household and freezes streaks; **automated nightly
+  backups**; and an optional **weekly digest + push notifications** via
+  [ntfy](https://ntfy.sh).
 
-**Savings goals**: in the reward shop, a reward a kid can't afford yet shows "tap to make it
-your goal" — picking it puts a themed goal panel (⭐ My Trophy Goal / My Dino Dream) on their
-home screen with a progress bar toward the cost, and it celebrates when they can afford it.
+**Under the hood:**
+- Offline-tolerant kiosk — task taps queue in the browser and sync when the connection
+  returns.
+- Five fully-realized themes driven by a single config object, so adding a sixth is a
+  data change, not a rewrite.
+- Everything is a single SQLite file on a mounted volume; schema migrations run
+  automatically on boot.
 
-**Reward follow-through**: approved redemptions land in a "To deliver" list in the parent
-pending queue until you tap ✓ Delivered — so "pick dinner" never gets approved and then
-forgotten. **Bonus awards** (Kids & Vaults → 🎁) grant points to one or both kids for
-off-chart moments, with a note that shows in history; each kid's vault split rules apply.
+## Quick start
 
-**Task scheduling**: every task can be limited to specific days of the week (day chips in
-the task form — e.g. "Pack backpack" on school nights only, trash duty on Tuesdays). Kids
-only see tasks scheduled for today, and streaks count only expected days: a weekdays-only
-task completed Friday and Monday is a continuous streak, and a Sunday-only task can't
-"break" midweek.
-
-**Backups**: a consistent SQLite snapshot is written to `<data>/backups/` on every boot and
-nightly at 3:15am (container time), keeping the last 14 (`BACKUP_KEEP` to change). The
-parent dashboard (Kids & Vaults) shows the latest backup and has a "Back up now" button.
-Restore = stop the container, replace `reward-chart.db` with a backup file, start.
-
-**Vacation mode**: the 🏖️ toggle in the parent dashboard pauses the whole household for
-travel or school breaks. Kids see a friendly themed "on break" screen instead of their task
-list (points and the reward shop stay available), no completions or mystery challenges
-happen, and — the important part — **streaks freeze**: days inside a vacation stretch never
-count as missed, so a 20-day streak from before the trip resumes at 20 the day you turn the
-toggle off. Vacation stretches are remembered permanently, so streak math stays correct
-forever after.
-
-**Sounds**: every sound is synthesized in the browser with the Web Audio API — no audio
-files, works offline. Task celebrations play a themed jingle (ref's whistle + fanfare for
-soccer, egg-crack + friendly roar for dino), mystery reveals shimmer, reward requests ding,
-the secret-code gate chimes or bonks, and finishing every task triggers a full fanfare. The
-🔊/🔇 button on the kid home screen mutes the whole kiosk (persists per device; recipes live
-in `client/src/sounds.js`).
-
-**Weekly digest**: every Sunday at 6pm (container time) a summary is pushed via ntfy —
-points and tasks per kid, live streaks, new badges, the most-skipped tasks (your signal for
-which chores are mispriced), and anything waiting for approval. Preview or send it anytime
-from Kids & Vaults → 📊 Weekly digest.
-
-**Notifications (optional)**: set `NTFY_URL` to an ntfy topic URL and the app pushes a
-notification whenever a kid taps a task or requests a reward, so you can approve from your
-phone without watching the queue. Unset = disabled; a down ntfy server never blocks the app.
-
-**Points & vaults**: each kid has a `checking` (spending) and `savings` bucket.
-- *Manual mode* (Aedan): all earnings land in checking; the kid can move points into savings
-  from their own screen.
-- *Auto-split mode* (Ashton): earnings split automatically (default 70% checking / 30%
-  savings, configurable). Splits round to whole points — a 1-point task goes 1/0, a 2-point
-  task 1/1 at 70/30.
-
-**Daily reset & streaks**: "today" is computed from the container's `TZ`. At local midnight
-the task list is fresh; approving a task on consecutive days builds its streak, missing a day
-breaks that task's streak (others are unaffected). Pending completions from a prior day
-expire — they can no longer be approved, but stay logged for parent visibility.
-
-**Offline-tolerant kiosk**: if the tablet loses the backend, task taps queue in the browser's
-localStorage and sync automatically when the connection returns (a banner shows how many taps
-are waiting). Retries are idempotent, so nothing double-counts.
-
-## Deploying on ChappyNAS (UGREEN UGOS)
-
-Runs as a single container alongside the existing Docker stack (Plex/Sonarr/Radarr/etc.).
-
-### With docker-compose (recommended)
+Runs anywhere Docker does — a home server, a NAS, or your laptop.
 
 ```bash
-# on the NAS, e.g. in /volume1/docker/reward-chart
-git clone <this repo> reward-chart && cd reward-chart
-# edit docker-compose.yml: set PARENT_PIN and TZ
+git clone https://github.com/chapdad031167/Kids-Reward-Chart-System.git
+cd Kids-Reward-Chart-System
 docker compose up -d --build
 ```
 
-### With plain docker
+Open **http://localhost:8090** (or `http://<server-ip>:8090` from another device on your
+network) and the **first-run setup wizard** walks you through naming the chart, choosing a
+parent PIN, and adding your first child — no config files to edit. Add the tablet's URL to
+its home screen for a full-screen kiosk.
 
-```bash
-docker build -t reward-chart .
-docker run -d --name reward-chart --restart unless-stopped \
-  -p 8090:8090 \
-  -e TZ=America/New_York \
-  -e PARENT_PIN=1234 \
-  -v /volume1/docker/reward-chart/data:/data \
-  reward-chart
+A pre-built image is also published to GHCR, so you can skip the build:
+
+```yaml
+services:
+  reward-chart:
+    image: ghcr.io/chapdad031167/kids-reward-chart-system:latest
+    restart: unless-stopped
+    ports:
+      - "8090:8090"
+    environment:
+      - TZ=America/New_York          # local timezone — daily reset keys off this
+      # - NTFY_URL=http://your-server:8093/reward-chart   # optional push notifications
+    volumes:
+      - ./data:/data                 # SQLite lives here — back up this folder
 ```
 
-Then open `http://<NAS-IP>:8090` from the kiosk tablet and any household device. Add it to
-the tablet's home screen in kiosk/fullscreen mode for the best experience.
-
-### Configuration
-
-| Env var      | Default            | Purpose                                        |
-| ------------ | ------------------ | ---------------------------------------------- |
-| `PORT`       | `8090`             | HTTP port inside the container                 |
-| `PARENT_PIN` | `1234`             | 4-digit PIN for the parent dashboard — change it |
-| `TZ`         | `America/New_York` | Local timezone for daily reset and streaks     |
-| `DATA_DIR`   | `/data`            | Where the SQLite file lives (mount a volume)   |
-| `NTFY_URL`   | *(unset)*          | ntfy topic URL for parent push notifications; unset disables |
-| `BACKUP_KEEP`| `14`               | How many nightly database backups to retain               |
-
-### Persistence & backup
-
-Everything lives in one SQLite file at `<volume>/reward-chart.db`. Back up the mounted `data/`
-folder (it may also contain `-wal`/`-shm` journal files — copy all three, or stop the
-container first). The database is created and seeded with both kids, the starter task list,
-and a starter reward catalog on first boot; seeding never runs again once data exists.
-
-## Local development
+### Local development
 
 ```bash
-# terminal 1 — backend on :8090 (creates + seeds ./data/reward-chart.db)
+# terminal 1 — API on :8090 (creates ./data/reward-chart.db)
 cd server && npm install && npm start
 
-# terminal 2 — frontend dev server on :5173, proxying /api to :8090
+# terminal 2 — Vite dev server on :5173, proxying /api to :8090
 cd client && npm install && npm run dev
 ```
 
-## Project layout
+### Configuration
+
+Everything is configured in the app (setup wizard + Settings tab). These env vars are
+optional overrides for scripted deploys:
+
+| Env var       | Default            | Purpose                                                    |
+| ------------- | ------------------ | --------------------------------------------------------- |
+| `PORT`        | `8090`             | HTTP port inside the container                            |
+| `TZ`          | `America/New_York` | Local timezone for the daily reset and streaks            |
+| `DATA_DIR`    | `/data`            | Where the SQLite file lives (mount a volume)              |
+| `PARENT_PIN`  | `1234`             | Fallback PIN before setup runs; the wizard sets the real one |
+| `APP_NAME`    | `Reward Chart`     | Fallback name before setup runs                           |
+| `NTFY_URL`    | *(unset)*          | ntfy topic URL for push notifications; unset disables     |
+| `BACKUP_KEEP` | `14`               | How many nightly database backups to retain               |
+
+## Tech stack & architecture
+
+- **Frontend** — React + Vite. Custom themed components, no UI kit. Audio is synthesized
+  live with the Web Audio API (no sound files). Offline tap queue in `localStorage`.
+- **Backend** — Node.js + Express, SQLite via `better-sqlite3` (one file, easy backup).
+  Small single-purpose modules — approval/streak/ledger logic, badges, vacation, backups,
+  digest — behind a public kiosk router and a PIN-gated parent router.
+- **Packaging** — multi-stage Docker build (Vite build served as static files by Express),
+  one container, one mounted volume. CI publishes the image to GHCR on push.
 
 ```
-server/            Node.js + Express + better-sqlite3 API
-  src/db.js          schema (kids, tasks, completions, streaks, points_ledger,
-                     rewards_catalog, redemptions, parent_actions)
-  src/seed.js        first-boot seed: both kids + starter tasks/rewards
-  src/service.js     approval, streak, ledger, undo, expiry, transfer logic
-  src/routes/        kiosk.js (kid-facing) and parent.js (PIN-protected)
-client/            React + Vite kiosk & dashboard
-  src/themes.js      per-kid theme config (colors, terminology, icons) —
-                     components never hardcode soccer/dino strings
-  src/api.js         fetch wrapper + offline tap queue
-  src/screens/       AvatarSelect, KidHome, ParentDashboard
-  src/components/    Celebration, ProgressMeter (bar + hatching egg), ui
-Dockerfile         multi-stage build: Vite build → static files served by Express
+server/
+  src/db.js          schema + automatic migrations
+  src/service.js     approval, streaks, ledger, undo, transfers, fresh-start
+  src/badges.js      achievement badges + levels
+  src/{vacation,backup,digest,familyGoal,bonus,schedule}.js
+  src/routes/        kiosk.js (public) · parent.js (PIN-protected)
+client/
+  src/themes.js      per-theme config: colors, terminology, icons, sounds
+  src/sounds.js      Web Audio synthesis
+  src/screens/       Setup · AvatarSelect · KidHome · ParentDashboard
+  src/components/     Celebration · ProgressMeter · EmojiPicker · KidCode · ui
 ```
 
-## Backlog
+## Design notes
 
-- **Multi-household or external/cloud accounts** — the app stays LAN-only.
+A few decisions that shaped the app:
+
+- **No cross-kid comparison, ever.** Each child sees only their own progress; the one
+  shared surface is a *cooperative* family goal. This was a hard rule from day one — the
+  point is to motivate each kid, not to rank them.
+- **Two vaults, not one.** Points split into spending and saving. Younger kids can
+  auto-split every earning; older kids choose what to move — a light, low-stakes way to
+  practice the save-vs-spend decision.
+- **Privacy by architecture.** Self-hosted and LAN-only means there's no account to
+  create and no children's data in someone else's cloud — a deliberate design choice, not
+  a limitation.
+- **Themes are data.** Colors, vocabulary, celebration, and sound for each theme live in
+  one config object, so the five themes share one codebase and a sixth is a small
+  addition.
+
+## License
+
+[MIT](LICENSE) — free to use, modify, and self-host.

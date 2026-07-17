@@ -24,19 +24,39 @@ import { listBackups, runBackup } from '../backup.js';
 import { checkBadges } from '../badges.js';
 import { getFamilyGoal, setFamilyGoal } from '../familyGoal.js';
 import { buildDigest, sendDigest } from '../digest.js';
-
-const PARENT_PIN = process.env.PARENT_PIN || '1234';
+import { getPin, setPin, getAppName, setAppName } from '../config.js';
 
 export const parent = Router();
 
 parent.post('/verify', (req, res) => {
-  res.json({ ok: (req.body?.pin ?? '') === PARENT_PIN });
+  res.json({ ok: (req.body?.pin ?? '') === getPin() });
 });
 
 // Every route below requires the PIN header.
 parent.use((req, res, next) => {
-  if (req.get('x-parent-pin') !== PARENT_PIN) return res.status(401).json({ error: 'bad_pin' });
+  if (req.get('x-parent-pin') !== getPin()) return res.status(401).json({ error: 'bad_pin' });
   next();
+});
+
+// ---- Instance settings ----
+
+parent.get('/settings', (req, res) => {
+  res.json({ appName: getAppName() });
+});
+
+parent.post('/settings', (req, res) => {
+  if (typeof req.body?.appName === 'string' && req.body.appName.trim().length > 0) {
+    setAppName(req.body.appName);
+  }
+  res.json({ ok: true, appName: getAppName() });
+});
+
+parent.post('/pin', (req, res) => {
+  if (!/^\d{4}$/.test(String(req.body?.pin ?? ''))) {
+    return res.status(400).json({ error: 'invalid_pin' });
+  }
+  setPin(String(req.body.pin));
+  res.json({ ok: true });
 });
 
 /** Today's pending completions plus all pending redemptions. */

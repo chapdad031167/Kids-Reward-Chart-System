@@ -70,36 +70,29 @@ export function ensureBonusPool() {
 
 const CATEGORY_IDS = { morning: 1, evening: 2, personal_space: 3, chores: 4, social_school: 5 };
 
-export function seedIfEmpty() {
-  const kidCount = db.prepare('SELECT COUNT(*) AS n FROM kids').get().n;
-  if (kidCount > 0) return false;
-
-  const seed = db.transaction(() => {
-    const insertKid = db.prepare(
-      `INSERT INTO kids (name, avatar_icon, theme, age, vault_mode, auto_split_ratio)
-       VALUES (?, ?, ?, ?, ?, ?)`
-    );
-    insertKid.run('Aedan', '⚽', 'soccer', 8, 'manual', 0.7);
-    insertKid.run('Ashton', '🦖', 'dino', 6, 'auto_split', 0.7);
-
-    const insertTask = db.prepare(
-      `INSERT INTO tasks (title, category_id, point_value, icon, active, kid_id)
-       VALUES (?, ?, ?, ?, 1, NULL)`
-    );
-    for (const t of SEED_TASKS) insertTask.run(t.title, CATEGORY_IDS[t.category], t.points, t.icon);
-
-    const insertReward = db.prepare(
-      `INSERT INTO rewards_catalog (kid_id, title, cost, bucket_required, icon, active)
-       VALUES (NULL, ?, ?, ?, ?, 1)`
-    );
-    for (const r of SEED_REWARDS) insertReward.run(r.title, r.cost, r.bucket, r.icon);
+/**
+ * Load the generic starter library — daily tasks, mystery bonus pool, and
+ * rewards — into a household. Opt-in from the setup wizard, so a fresh
+ * install can also start completely empty. Each section is skipped if it
+ * already has content, making this safe to call more than once.
+ */
+export function seedStarterContent() {
+  const run = db.transaction(() => {
+    if (db.prepare(`SELECT COUNT(*) AS n FROM tasks WHERE is_bonus = 0`).get().n === 0) {
+      const insertTask = db.prepare(
+        `INSERT INTO tasks (title, category_id, point_value, icon, active, kid_id)
+         VALUES (?, ?, ?, ?, 1, NULL)`
+      );
+      for (const t of SEED_TASKS) insertTask.run(t.title, CATEGORY_IDS[t.category], t.points, t.icon);
+    }
+    ensureBonusPool();
+    if (db.prepare(`SELECT COUNT(*) AS n FROM rewards_catalog`).get().n === 0) {
+      const insertReward = db.prepare(
+        `INSERT INTO rewards_catalog (kid_id, title, cost, bucket_required, icon, active)
+         VALUES (NULL, ?, ?, ?, ?, 1)`
+      );
+      for (const r of SEED_REWARDS) insertReward.run(r.title, r.cost, r.bucket, r.icon);
+    }
   });
-
-  seed();
-  return true;
-}
-
-if (process.argv[1] && process.argv[1].endsWith('seed.js')) {
-  const seeded = seedIfEmpty();
-  console.log(seeded ? 'Database seeded.' : 'Database already has data; skipped seeding.');
+  run();
 }

@@ -134,6 +134,121 @@ button {
   opacity: 0.9;
 }
 
+/* ---------- First-run setup wizard ---------- */
+
+.setup-screen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: linear-gradient(160deg, #16324a 0%, #1e4d6b 60%, #16324a 100%);
+}
+
+.setup-card {
+  background: #fff;
+  color: #1c2b21;
+  border-radius: 22px;
+  padding: 26px;
+  width: min(520px, 96vw);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+}
+
+.setup-progress {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.setup-dot {
+  flex: 1;
+  min-width: 60px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 6px 4px;
+  border-radius: 8px;
+  background: #edf2f7;
+  color: #a0aec0;
+}
+
+.setup-dot.on {
+  background: #c6f6d5;
+  color: #22543d;
+}
+
+.setup-step h1 {
+  font-size: 26px;
+  margin: 0 0 8px;
+}
+
+.setup-step p {
+  font-size: 15px;
+  line-height: 1.5;
+  color: #4a5568;
+}
+
+.setup-label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #4a5568;
+  margin-top: 14px;
+}
+
+.setup-label input {
+  font-size: 16px;
+  padding: 12px;
+  border: 1px solid #cbd5e0;
+  border-radius: 10px;
+  font-family: inherit;
+}
+
+.setup-themes {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
+.setup-check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 15px;
+  font-weight: 700;
+  margin: 12px 0;
+}
+
+.setup-check input {
+  width: 22px;
+  height: 22px;
+}
+
+.setup-summary {
+  background: #f7fafc;
+  border-radius: 12px;
+  padding: 12px;
+  font-size: 15px;
+}
+
+.setup-error {
+  color: #c53030;
+  font-weight: 700;
+  font-size: 14px;
+  margin-top: 10px;
+}
+
+.setup-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 22px;
+  justify-content: flex-end;
+}
+
 /* ---------- Kid secret code gate ---------- */
 
 .code-gate {

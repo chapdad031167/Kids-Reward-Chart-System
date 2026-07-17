@@ -40,7 +40,7 @@ function DayPicker({ value, onChange }) {
   );
 }
 
-export default function ParentDashboard() {
+export default function ParentDashboard({ onAppNameChange }) {
   const [pin, setPin] = useState(() => sessionStorage.getItem('parent-pin') || null);
   if (!pin) {
     return (
@@ -52,10 +52,16 @@ export default function ParentDashboard() {
       />
     );
   }
-  return <Dashboard pin={pin} onLock={() => {
-    sessionStorage.removeItem('parent-pin');
-    setPin(null);
-  }} />;
+  return (
+    <Dashboard
+      pin={pin}
+      onAppNameChange={onAppNameChange}
+      onLock={() => {
+        sessionStorage.removeItem('parent-pin');
+        setPin(null);
+      }}
+    />
+  );
 }
 
 function PinScreen({ onVerified }) {
@@ -129,7 +135,7 @@ function PinScreen({ onVerified }) {
   );
 }
 
-function Dashboard({ pin, onLock }) {
+function Dashboard({ pin, onLock, onAppNameChange }) {
   const [tab, setTab] = useState('pending');
   const [toast, setToast] = useState(null);
   const [vacation, setVacation] = useState(null); // {on, since}
@@ -204,6 +210,7 @@ function Dashboard({ pin, onLock }) {
           ['tasks', '📋 Tasks'],
           ['rewards', '🎁 Rewards'],
           ['kids', '🏦 Kids & Vaults'],
+          ['settings', '⚙️ Settings'],
         ].map(([key, label]) => (
           <button
             key={key}
@@ -219,8 +226,110 @@ function Dashboard({ pin, onLock }) {
         {tab === 'tasks' && <TasksTab client={client} notify={notify} />}
         {tab === 'rewards' && <RewardsTab client={client} notify={notify} />}
         {tab === 'kids' && <KidsTab client={client} notify={notify} />}
+        {tab === 'settings' && (
+          <SettingsTab client={client} notify={notify} onAppNameChange={onAppNameChange} />
+        )}
       </div>
       {toast && <Toast message={toast} onDone={() => setToast(null)} />}
+    </div>
+  );
+}
+
+// ---------- Settings ----------
+
+function SettingsTab({ client, notify, onAppNameChange }) {
+  const [appName, setAppName] = useState('');
+  const [loaded, setLoaded] = useState(false);
+  const [pin, setPinValue] = useState('');
+  const [pin2, setPin2] = useState('');
+
+  const load = useCallback(() => {
+    client
+      .get('/api/parent/settings')
+      .then((s) => {
+        setAppName(s.appName);
+        setLoaded(true);
+      })
+      .catch(() => notify('Failed to load settings'));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(load, [load]);
+
+  async function saveName() {
+    try {
+      await client.post('/api/parent/settings', { appName: appName.trim() });
+      notify('Chart name updated');
+      onAppNameChange?.();
+    } catch {
+      notify('Could not save the name');
+    }
+  }
+
+  async function savePin() {
+    if (!/^\d{4}$/.test(pin) || pin !== pin2) {
+      notify('Enter a 4-digit PIN twice, matching');
+      return;
+    }
+    try {
+      await client.post('/api/parent/pin', { pin });
+      // The PIN this session authenticated with is now stale.
+      sessionStorage.setItem('parent-pin', pin);
+      setPinValue('');
+      setPin2('');
+      notify('PIN changed');
+    } catch {
+      notify('Could not change PIN');
+    }
+  }
+
+  if (!loaded) return 'Loading…';
+
+  return (
+    <div>
+      <h3 style={{ marginTop: 0 }}>Chart name</h3>
+      <p style={{ fontSize: 14, color: '#4a5568' }}>Shown on the kids' home screen and the browser tab.</p>
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 24 }}>
+        <input
+          value={appName}
+          maxLength={60}
+          onChange={(e) => setAppName(e.target.value)}
+          style={{ flex: 1, minWidth: 200, fontSize: 16, padding: 12, border: '1px solid #cbd5e0', borderRadius: 10 }}
+        />
+        <button className="btn primary" disabled={!appName.trim()} onClick={saveName}>
+          Save name
+        </button>
+      </div>
+
+      <h3>Parent PIN</h3>
+      <p style={{ fontSize: 14, color: '#4a5568' }}>Change the 4-digit code that opens this dashboard.</p>
+      <div className="form-grid" style={{ maxWidth: 320 }}>
+        <label>
+          New PIN
+          <input
+            type="password"
+            inputMode="numeric"
+            maxLength={4}
+            value={pin}
+            onChange={(e) => setPinValue(e.target.value.replace(/\D/g, ''))}
+          />
+        </label>
+        <label>
+          Confirm PIN
+          <input
+            type="password"
+            inputMode="numeric"
+            maxLength={4}
+            value={pin2}
+            onChange={(e) => setPin2(e.target.value.replace(/\D/g, ''))}
+          />
+        </label>
+      </div>
+      <div style={{ marginTop: 12 }}>
+        <button className="btn primary" disabled={!/^\d{4}$/.test(pin) || pin !== pin2} onClick={savePin}>
+          Change PIN
+        </button>
+      </div>
     </div>
   );
 }

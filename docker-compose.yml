@@ -9,11 +9,13 @@ services:
     environment:
       # Local timezone — daily reset and streaks key off this.
       - TZ=America/New_York
-      # 4-digit PIN for the parent dashboard. CHANGE THIS.
-      - PARENT_PIN=1234
+      # The app name and parent PIN are set in the first-run setup wizard,
+      # so nothing else here is required. PARENT_PIN below is only an
+      # optional fallback default before setup runs; change or remove it.
+      # - PARENT_PIN=1234
       # Optional: full ntfy topic URL for parent push notifications
       # (new pending tasks / reward requests). Leave commented to disable.
-      # - NTFY_URL=http://chappynas:8093/reward-chart
+      # - NTFY_URL=http://your-server:8093/reward-chart
     volumes:
       # SQLite lives here — survives container rebuilds. Back up this folder.
       - ./data:/data

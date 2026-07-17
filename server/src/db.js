@@ -192,6 +192,14 @@ if (!taskColumns.includes('days')) {
   db.exec(`ALTER TABLE tasks ADD COLUMN days TEXT`);
 }
 
+// First-run setup: an install that already has kids predates the setup
+// wizard, so mark it configured — the wizard only appears on a truly
+// fresh database.
+const configuredRow = db.prepare(`SELECT value FROM settings WHERE key = 'household_configured'`).get();
+if (!configuredRow && db.prepare(`SELECT COUNT(*) AS n FROM kids`).get().n > 0) {
+  db.prepare(`INSERT INTO settings (key, value) VALUES ('household_configured', '1')`).run();
+}
+
 // Savings goals + reward fulfillment (v1.2).
 if (!kidColumns.includes('goal_reward_id')) {
   db.exec(`ALTER TABLE kids ADD COLUMN goal_reward_id INTEGER REFERENCES rewards_catalog(id)`);
