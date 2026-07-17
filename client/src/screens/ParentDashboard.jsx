@@ -742,6 +742,9 @@ function KidsTab({ client, notify }) {
   const [familyGoal, setFamilyGoalState] = useState(null);
   const [editingFamilyGoal, setEditingFamilyGoal] = useState(false);
   const [digestPreview, setDigestPreview] = useState(null);
+  const [addingKid, setAddingKid] = useState(false);
+  const [clearingBadges, setClearingBadges] = useState(null); // kid
+  const [removingKid, setRemovingKid] = useState(null); // kid
 
   const load = useCallback(() => {
     client.get('/api/parent/kids').then(setKids).catch(() => notify('Failed to load kids'));
@@ -814,7 +817,66 @@ function KidsTab({ client, notify }) {
         >
           📊 Weekly digest
         </button>
+        <button className="btn secondary" onClick={() => setAddingKid(true)}>
+          ➕ Add kid
+        </button>
       </div>
+
+      {addingKid && (
+        <AddKidModal
+          client={client}
+          notify={notify}
+          onClose={() => {
+            setAddingKid(false);
+            load();
+          }}
+        />
+      )}
+
+      {clearingBadges && (
+        <Modal title={`Clear ${clearingBadges.name}'s trophy case?`} onClose={() => setClearingBadges(null)}>
+          <p style={{ fontSize: 15, lineHeight: 1.5 }}>
+            This removes <strong>all of {clearingBadges.name}'s badges</strong> and takes back
+            the bonus points those badges paid. Heads up: badges based on totals they've
+            already passed (like "100 points earned") will be re-earned the next time they
+            open their screen — this is mainly for correcting things after testing or
+            history changes.
+          </p>
+          <div className="modal-actions">
+            <button className="btn secondary" onClick={() => setClearingBadges(null)}>
+              Cancel
+            </button>
+            <button
+              className="btn danger"
+              style={{ flex: 1 }}
+              onClick={async () => {
+                try {
+                  const r = await client.post(`/api/parent/kids/${clearingBadges.id}/clear-badges`);
+                  notify(`Cleared ${r.cleared} badge${r.cleared === 1 ? '' : 's'} for ${clearingBadges.name}`);
+                } catch {
+                  notify('Clear failed');
+                }
+                setClearingBadges(null);
+                load();
+              }}
+            >
+              Yes, clear trophy case
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {removingKid && (
+        <RemoveKidModal
+          kid={removingKid}
+          client={client}
+          notify={notify}
+          onClose={() => {
+            setRemovingKid(null);
+            load();
+          }}
+        />
+      )}
 
       {digestPreview !== null && (
         <Modal title="📊 Weekly digest" onClose={() => setDigestPreview(null)}>
@@ -919,6 +981,12 @@ function KidsTab({ client, notify }) {
             <button className="btn danger" onClick={() => setResetting(kid)}>
               🧹 Reset today
             </button>
+            <button className="btn secondary" onClick={() => setClearingBadges(kid)}>
+              🏅 Clear trophy case
+            </button>
+            <button className="btn danger" onClick={() => setRemovingKid(kid)}>
+              🗑️ Remove kid
+            </button>
           </span>
         </div>
       ))}
@@ -989,6 +1057,116 @@ function KidsTab({ client, notify }) {
         </button>
       </div>
     </div>
+  );
+}
+
+function AddKidModal({ client, notify, onClose }) {
+  const [name, setName] = useState('');
+  const [age, setAge] = useState('');
+  const [theme, setTheme] = useState('soccer');
+  const [avatar, setAvatar] = useState('⚽');
+  const parsedAge = Number(age);
+  const valid = name.trim().length > 0 && Number.isInteger(parsedAge) && parsedAge >= 1 && parsedAge <= 18;
+
+  function pickTheme(t) {
+    setTheme(t);
+    setAvatar(t === 'dino' ? '🦖' : '⚽');
+  }
+
+  async function save() {
+    try {
+      await client.post('/api/parent/kids', {
+        name: name.trim(),
+        age: parsedAge,
+        theme,
+        avatar_icon: avatar,
+      });
+      notify(`Welcome, ${name.trim()}! 🎉`);
+      onClose();
+    } catch {
+      notify('Could not add the kid — check the fields');
+    }
+  }
+
+  return (
+    <Modal title="➕ Add a kid" onClose={onClose}>
+      <div className="form-grid">
+        <label>
+          Name
+          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Avery" />
+        </label>
+        <label>
+          Age
+          <input type="number" min="1" max="18" value={age} onChange={(e) => setAge(e.target.value)} />
+        </label>
+        <label>
+          Theme
+          <span style={{ display: 'flex', gap: 10, marginTop: 4 }}>
+            <button type="button" className={`btn ${theme === 'soccer' ? 'primary' : 'secondary'}`} onClick={() => pickTheme('soccer')}>
+              ⚽ Soccer
+            </button>
+            <button type="button" className={`btn ${theme === 'dino' ? 'primary' : 'secondary'}`} onClick={() => pickTheme('dino')}>
+              🦖 Dinosaur
+            </button>
+          </span>
+        </label>
+        <label>
+          Avatar
+          <EmojiPicker value={avatar} onChange={setAvatar} />
+        </label>
+      </div>
+      <p style={{ fontSize: 13, color: '#4a5568' }}>
+        Starts in manual vault mode with no secret code — adjust both here in Kids & Vaults
+        after adding. Tasks assigned to "Both kids" apply automatically.
+      </p>
+      <div className="modal-actions">
+        <button className="btn secondary" onClick={onClose}>
+          Cancel
+        </button>
+        <button className="btn primary" disabled={!valid} onClick={save}>
+          Add kid
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
+function RemoveKidModal({ kid, client, notify, onClose }) {
+  const [typed, setTyped] = useState('');
+  const match = typed.trim().toLowerCase() === kid.name.toLowerCase();
+
+  async function remove() {
+    try {
+      await client.delete(`/api/parent/kids/${kid.id}`);
+      notify(`${kid.name} removed`);
+    } catch {
+      notify('Remove failed');
+    }
+    onClose();
+  }
+
+  return (
+    <Modal title={`🗑️ Remove ${kid.name}?`} onClose={onClose}>
+      <p style={{ fontSize: 15, lineHeight: 1.5 }}>
+        This <strong>permanently deletes {kid.name} and everything about them</strong> — all
+        points, streaks, badges, history, reward requests, and any tasks or rewards that were
+        just theirs. There is no undo. (Going on a break? Use Vacation Mode instead.)
+      </p>
+      <div className="form-grid">
+        <label>
+          Type <strong>{kid.name}</strong> to confirm
+          <input value={typed} onChange={(e) => setTyped(e.target.value)} placeholder={kid.name} />
+        </label>
+      </div>
+      <div className="modal-actions">
+        <button className="btn secondary" onClick={onClose}>
+          Cancel
+        </button>
+        <button className="btn danger" style={{ flex: 1 }} disabled={!match} onClick={remove}>
+          Permanently remove {kid.name}
+        </button>
+      </div>
+    </Modal>
   );
 }
 

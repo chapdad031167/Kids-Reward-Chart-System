@@ -13,6 +13,8 @@ import {
   resetKidDay,
   adjustBalance,
   awardPoints,
+  clearBadges,
+  deleteKid,
 } from '../service.js';
 import { vacationState, setVacation } from '../vacation.js';
 import { listBackups, runBackup } from '../backup.js';
@@ -317,6 +319,42 @@ parent.patch('/rewards/:id', (req, res) => {
 parent.get('/kids', (req, res) => {
   const kids = db.prepare(`SELECT * FROM kids ORDER BY id`).all();
   res.json(kids.map((k) => ({ ...k, balances: balances(k.id) })));
+});
+
+/** Add a kid to the household. */
+parent.post('/kids', (req, res) => {
+  const { name, age, theme, avatar_icon } = req.body || {};
+  if (
+    typeof name !== 'string' ||
+    name.trim().length === 0 ||
+    !Number.isInteger(age) ||
+    age < 1 ||
+    age > 18 ||
+    !['soccer', 'dino'].includes(theme)
+  ) {
+    return res.status(400).json({ error: 'invalid_kid' });
+  }
+  const info = db
+    .prepare(
+      `INSERT INTO kids (name, avatar_icon, theme, age, vault_mode, auto_split_ratio)
+       VALUES (?, ?, ?, ?, 'manual', 0.7)`
+    )
+    .run(name.trim(), avatar_icon || (theme === 'dino' ? '🦖' : '⚽'), theme, age);
+  res.status(201).json(db.prepare(`SELECT * FROM kids WHERE id = ?`).get(info.lastInsertRowid));
+});
+
+/** Permanently remove a kid and all their data. */
+parent.delete('/kids/:id', (req, res) => {
+  const result = deleteKid(Number(req.params.id));
+  if (!result.ok) return res.status(404).json({ error: result.reason });
+  res.json(result);
+});
+
+/** Wipe a kid's badge collection (badges + their bonus points). */
+parent.post('/kids/:id/clear-badges', (req, res) => {
+  const kid = db.prepare(`SELECT id FROM kids WHERE id = ?`).get(req.params.id);
+  if (!kid) return res.status(404).json({ error: 'kid_not_found' });
+  res.json({ ok: true, cleared: clearBadges(kid.id) });
 });
 
 parent.patch('/kids/:id', (req, res) => {

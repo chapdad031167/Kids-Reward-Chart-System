@@ -321,6 +321,43 @@ export const awardPoints = db.transaction((kidIds, amount, note) => {
   return { ok: true };
 });
 
+/**
+ * Wipe a kid's badge collection and claw back badge bonus points.
+ * Threshold badges the kid still qualifies for will re-earn on their
+ * next visit — this is a correction tool, not a progress reset.
+ */
+export const clearBadges = db.transaction((kidId) => {
+  const cleared = db.prepare(`SELECT COUNT(*) AS n FROM badges WHERE kid_id = ?`).get(kidId).n;
+  db.prepare(`DELETE FROM badges WHERE kid_id = ?`).run(kidId);
+  db.prepare(`DELETE FROM points_ledger WHERE kid_id = ? AND source LIKE 'badge:%'`).run(kidId);
+  return cleared;
+});
+
+/**
+ * Permanently delete a kid and everything about them: completions,
+ * streaks, ledger, badges, redemptions, mystery assignments, and any
+ * kid-specific tasks/rewards. Clears the undo stack since its snapshots
+ * may reference deleted rows.
+ */
+export const deleteKid = db.transaction((kidId) => {
+  const kid = db.prepare(`SELECT * FROM kids WHERE id = ?`).get(kidId);
+  if (!kid) return { ok: false, reason: 'kid_not_found' };
+
+  db.prepare(`DELETE FROM completions WHERE kid_id = ?`).run(kidId);
+  db.prepare(`DELETE FROM streaks WHERE kid_id = ?`).run(kidId);
+  db.prepare(`DELETE FROM points_ledger WHERE kid_id = ?`).run(kidId);
+  db.prepare(`DELETE FROM badges WHERE kid_id = ?`).run(kidId);
+  db.prepare(`DELETE FROM redemptions WHERE kid_id = ?`).run(kidId);
+  db.prepare(`DELETE FROM bonus_assignments WHERE kid_id = ?`).run(kidId);
+  // Kid-specific tasks/rewards: completions/redemptions referencing them
+  // belonged only to this kid and are gone above.
+  db.prepare(`DELETE FROM tasks WHERE kid_id = ?`).run(kidId);
+  db.prepare(`DELETE FROM rewards_catalog WHERE kid_id = ?`).run(kidId);
+  db.prepare(`UPDATE parent_actions SET undone = 1 WHERE undone = 0`).run();
+  db.prepare(`DELETE FROM kids WHERE id = ?`).run(kidId);
+  return { ok: true, name: kid.name };
+});
+
 /** Kid-initiated (or parent-initiated) transfer between buckets. */
 export const transferPoints = db.transaction((kidId, from, to, amount) => {
   if (!['checking', 'savings'].includes(from) || !['checking', 'savings'].includes(to) || from === to) {

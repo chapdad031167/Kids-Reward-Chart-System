@@ -114,5 +114,6 @@ export function parentApi(pin) {
     get: (url) => request(url, { headers }),
     post: (url, body) => request(url, { method: 'POST', body, headers }),
     patch: (url, body) => request(url, { method: 'PATCH', body, headers }),
+    delete: (url) => request(url, { method: 'DELETE', headers }),
   };
 }

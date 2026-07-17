@@ -42,6 +42,12 @@ the pool in the Tasks tab: any task with the ✨ *Mystery bonus task* checkbox i
 the daily list and enters the mystery rotation. The day schedule and task pick are
 deterministic per (kid, date), so restarts and multiple devices always agree.
 
+**Kid management**: Kids & Vaults → ➕ Add kid (name, age, soccer or dino theme, avatar) —
+new kids automatically get every "Both kids" task. 🗑️ Remove kid permanently deletes a kid
+and all their data behind a type-their-name confirmation. 🏅 Clear trophy case wipes a kid's
+badges and their bonus points (threshold badges they still qualify for re-earn on next
+visit — it's a correction tool).
+
 **Badges, levels & family goal**: kids earn permanent badges (first points, 100/250/500
 lifetime, 3/7/14/30-day streaks — streak badges pay bonus points — mysteries solved, perfect
 day, super saver) with a full-screen celebration on earn and a themed trophy case (Trophy
