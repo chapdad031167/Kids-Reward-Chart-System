@@ -87,6 +87,21 @@ button {
   border: 4px solid #fbc963;
 }
 
+.avatar-btn.space {
+  background: linear-gradient(160deg, #1a1f4b, #2d3585);
+  border: 4px solid #ffd94a;
+}
+
+.avatar-btn.fantasy {
+  background: linear-gradient(160deg, #6d28a8, #9b4fd1);
+  border: 4px solid #f5b8d9;
+}
+
+.avatar-btn.racing {
+  background: linear-gradient(160deg, #8f1d1d, #c23b2e);
+  border: 4px solid #ffcf3f;
+}
+
 @keyframes bob {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-10px); }
@@ -1015,6 +1030,74 @@ button {
 @keyframes dino-pop {
   0% { transform: translateY(30px) scale(0.2); opacity: 0; }
   100% { transform: translateY(0) scale(1); opacity: 1; }
+}
+
+/* space: rocket launches up past a planet */
+
+.space-planet {
+  position: absolute;
+  top: 24px;
+  right: 30px;
+  font-size: 64px;
+}
+
+.space-rocket {
+  position: absolute;
+  bottom: 30px;
+  left: 40%;
+  font-size: 56px;
+  animation: rocket-up 1s cubic-bezier(0.3, 0.1, 0.5, 1) forwards;
+}
+
+@keyframes rocket-up {
+  0% { transform: translateY(0) rotate(0deg) scale(1); }
+  100% { transform: translateY(-240px) rotate(-8deg) scale(0.8); }
+}
+
+/* fantasy: wand wave + crown pop */
+
+.magic-wand {
+  position: absolute;
+  bottom: 60px;
+  left: 40px;
+  font-size: 60px;
+  animation: wand-wave 0.9s ease-in-out;
+}
+
+.magic-crown {
+  position: absolute;
+  top: 40px;
+  font-size: 64px;
+  animation: dino-pop 0.7s 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@keyframes wand-wave {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(-25deg); }
+  60% { transform: rotate(20deg) translateY(-12px); }
+}
+
+/* racing: car zooms across to the flag */
+
+.race-flag {
+  position: absolute;
+  right: 16px;
+  bottom: 46px;
+  font-size: 60px;
+  animation: dino-pop 0.4s 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.race-car {
+  position: absolute;
+  left: 8px;
+  bottom: 40px;
+  font-size: 54px;
+  animation: car-zoom 0.9s cubic-bezier(0.4, 0, 0.6, 1) forwards;
+}
+
+@keyframes car-zoom {
+  0% { transform: translateX(0) scale(1); }
+  100% { transform: translateX(min(280px, 62vw)) scale(0.95); }
 }
 
 /* confetti */

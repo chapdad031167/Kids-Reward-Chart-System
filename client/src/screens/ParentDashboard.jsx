@@ -745,6 +745,7 @@ function KidsTab({ client, notify }) {
   const [addingKid, setAddingKid] = useState(false);
   const [clearingBadges, setClearingBadges] = useState(null); // kid
   const [removingKid, setRemovingKid] = useState(null); // kid
+  const [freshStarting, setFreshStarting] = useState(false);
 
   const load = useCallback(() => {
     client.get('/api/parent/kids').then(setKids).catch(() => notify('Failed to load kids'));
@@ -940,6 +941,29 @@ function KidsTab({ client, notify }) {
             <strong>{kid.balances.savings}</strong>
             <div style={{ marginTop: 10, display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
               <label style={{ fontWeight: 700, fontSize: 14 }}>
+                Theme:{' '}
+                <select
+                  value={kid.theme}
+                  onChange={async (e) => {
+                    const o = THEME_OPTIONS.find((x) => x.key === e.target.value);
+                    try {
+                      await client.patch(`/api/parent/kids/${kid.id}`, { theme: o.key, avatar_icon: o.avatar });
+                      notify(`${kid.name} is now ${o.label}!`);
+                    } catch {
+                      notify('Theme change failed');
+                    }
+                    load();
+                  }}
+                  style={{ fontSize: 15, padding: 8 }}
+                >
+                  {THEME_OPTIONS.map((o) => (
+                    <option key={o.key} value={o.key}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label style={{ fontWeight: 700, fontSize: 14 }}>
                 Vault mode:{' '}
                 <select
                   value={kid.vault_mode}
@@ -1056,9 +1080,85 @@ function KidsTab({ client, notify }) {
           Back up now
         </button>
       </div>
+
+      <div className="pending-item" style={{ alignItems: 'flex-start' }}>
+        <span style={{ fontSize: 28 }}>🔄</span>
+        <span className="what">
+          <strong>Fresh start</strong> — wipe all points, streaks, badges, and history (e.g.
+          after testing) while keeping kids, themes, secret codes, tasks, rewards, and
+          categories. A safety backup is saved first.
+        </span>
+        <button className="btn danger" onClick={() => setFreshStarting(true)}>
+          🔄 Fresh start
+        </button>
+      </div>
+
+      {freshStarting && (
+        <FreshStartModal
+          client={client}
+          notify={notify}
+          onClose={() => {
+            setFreshStarting(false);
+            load();
+          }}
+        />
+      )}
     </div>
   );
 }
+
+function FreshStartModal({ client, notify, onClose }) {
+  const [typed, setTyped] = useState('');
+  const match = typed.trim().toUpperCase() === 'FRESH';
+
+  async function go() {
+    try {
+      const r = await client.post('/api/parent/fresh-start');
+      notify(`Fresh start done — safety backup saved: ${r.backup}`);
+    } catch {
+      notify('Fresh start failed — check server logs');
+    }
+    onClose();
+  }
+
+  return (
+    <Modal title="🔄 Fresh start?" onClose={onClose}>
+      <p style={{ fontSize: 15, lineHeight: 1.5 }}>
+        <strong>Wipes:</strong> all points, streaks, badges, task history, reward requests,
+        mystery picks, undo history, and vacation history — for every kid, back to zero.
+        <br />
+        <strong>Keeps:</strong> the kids themselves (themes, secret codes, vault settings),
+        all tasks and schedules, rewards, categories, and the family goal (its progress
+        restarts from zero).
+        <br />
+        A backup is saved automatically first, so this is recoverable — but it's still a big
+        red button.
+      </p>
+      <div className="form-grid">
+        <label>
+          Type <strong>FRESH</strong> to confirm
+          <input value={typed} onChange={(e) => setTyped(e.target.value)} placeholder="FRESH" />
+        </label>
+      </div>
+      <div className="modal-actions">
+        <button className="btn secondary" onClick={onClose}>
+          Cancel
+        </button>
+        <button className="btn danger" style={{ flex: 1 }} disabled={!match} onClick={go}>
+          Wipe and start fresh
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
+const THEME_OPTIONS = [
+  { key: 'soccer', label: '⚽ Soccer', avatar: '⚽' },
+  { key: 'dino', label: '🦖 Dinosaur', avatar: '🦖' },
+  { key: 'space', label: '🚀 Space', avatar: '🚀' },
+  { key: 'fantasy', label: '🦄 Fantasy', avatar: '🦄' },
+  { key: 'racing', label: '🏎️ Racing', avatar: '🏎️' },
+];
 
 function AddKidModal({ client, notify, onClose }) {
   const [name, setName] = useState('');
@@ -1070,7 +1170,7 @@ function AddKidModal({ client, notify, onClose }) {
 
   function pickTheme(t) {
     setTheme(t);
-    setAvatar(t === 'dino' ? '🦖' : '⚽');
+    setAvatar(THEME_OPTIONS.find((o) => o.key === t)?.avatar || '⭐');
   }
 
   async function save() {
@@ -1101,13 +1201,17 @@ function AddKidModal({ client, notify, onClose }) {
         </label>
         <label>
           Theme
-          <span style={{ display: 'flex', gap: 10, marginTop: 4 }}>
-            <button type="button" className={`btn ${theme === 'soccer' ? 'primary' : 'secondary'}`} onClick={() => pickTheme('soccer')}>
-              ⚽ Soccer
-            </button>
-            <button type="button" className={`btn ${theme === 'dino' ? 'primary' : 'secondary'}`} onClick={() => pickTheme('dino')}>
-              🦖 Dinosaur
-            </button>
+          <span style={{ display: 'flex', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
+            {THEME_OPTIONS.map((o) => (
+              <button
+                type="button"
+                key={o.key}
+                className={`btn ${theme === o.key ? 'primary' : 'secondary'}`}
+                onClick={() => pickTheme(o.key)}
+              >
+                {o.label}
+              </button>
+            ))}
           </span>
         </label>
         <label>

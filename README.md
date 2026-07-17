@@ -42,11 +42,17 @@ the pool in the Tasks tab: any task with the ✨ *Mystery bonus task* checkbox i
 the daily list and enters the mystery rotation. The day schedule and task pick are
 deterministic per (kid, date), so restarts and multiple devices always agree.
 
-**Kid management**: Kids & Vaults → ➕ Add kid (name, age, soccer or dino theme, avatar) —
-new kids automatically get every "Both kids" task. 🗑️ Remove kid permanently deletes a kid
-and all their data behind a type-their-name confirmation. 🏅 Clear trophy case wipes a kid's
-badges and their bonus points (threshold badges they still qualify for re-earn on next
-visit — it's a correction tool).
+**Kid management**: Kids & Vaults → ➕ Add kid (name, age, theme, avatar) — new kids
+automatically get every "Both kids" task. Five themes: ⚽ Soccer, 🦖 Dinosaur, 🚀 Space,
+🦄 Fantasy, 🏎️ Racing — each with its own palette, vocabulary (GOAL!/ROAR!/BLAST OFF!/
+TA-DA!/VROOM!), celebration animation, synthesized jingle, level titles, and vault names;
+any kid's theme can be switched anytime from their row. 🗑️ Remove kid permanently deletes a
+kid and all their data behind a type-their-name confirmation. 🏅 Clear trophy case wipes a
+kid's badges and their bonus points (threshold badges they still qualify for re-earn on
+next visit — it's a correction tool). **🔄 Fresh start** (bottom of the tab, type FRESH to
+confirm) wipes every kid's points, streaks, badges, and history — perfect after a testing
+period — while keeping kids, themes, secret codes, tasks, rewards, and categories; a safety
+backup is written automatically first.
 
 **Badges, levels & family goal**: kids earn permanent badges (first points, 100/250/500
 lifetime, 3/7/14/30-day streaks — streak badges pay bonus points — mysteries solved, perfect

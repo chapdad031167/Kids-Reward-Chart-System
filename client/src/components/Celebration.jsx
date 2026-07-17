@@ -47,6 +47,24 @@ export default function Celebration({ theme, onDone }) {
             <span className="roar-bubble">ROAR!</span>
           </>
         )}
+        {theme.celebration === 'space' && (
+          <>
+            <span className="space-planet">🪐</span>
+            <span className="space-rocket">🚀</span>
+          </>
+        )}
+        {theme.celebration === 'fantasy' && (
+          <>
+            <span className="magic-wand">🪄</span>
+            <span className="magic-crown">👑</span>
+          </>
+        )}
+        {theme.celebration === 'racing' && (
+          <>
+            <span className="race-flag">🏁</span>
+            <span className="race-car">🏎️</span>
+          </>
+        )}
         <div className="celebration-word">{theme.terms.celebration}</div>
         <div className="celebration-sub">{theme.terms.celebrationSub}</div>
       </div>

@@ -1,6 +1,7 @@
 import { db, balances } from './db.js';
 import { todayStr, prevDay, nowIso } from './dates.js';
 import { prevExpectedDay } from './schedule.js';
+import { getSetting, setSetting } from './vacation.js';
 
 /**
  * Lazy daily housekeeping: pending completions from prior days expire.
@@ -356,6 +357,39 @@ export const deleteKid = db.transaction((kidId) => {
   db.prepare(`UPDATE parent_actions SET undone = 1 WHERE undone = 0`).run();
   db.prepare(`DELETE FROM kids WHERE id = ?`).run(kidId);
   return { ok: true, name: kid.name };
+});
+
+/**
+ * Fresh start: wipe every bit of activity (points, streaks, badges,
+ * history, redemptions, mystery picks, undo stack, vacation history)
+ * while keeping all configuration — kids, themes, secret codes, vault
+ * settings, tasks, rewards, categories. A set family goal survives but
+ * restarts its progress count from now.
+ */
+export const freshStart = db.transaction(() => {
+  for (const table of [
+    'completions',
+    'streaks',
+    'points_ledger',
+    'badges',
+    'redemptions',
+    'bonus_assignments',
+    'parent_actions',
+    'vacation_days',
+  ]) {
+    db.prepare(`DELETE FROM ${table}`).run();
+  }
+  setSetting('vacation_mode', '0');
+  setSetting('vacation_since', '');
+  const familyGoalRaw = getSetting('family_goal');
+  if (familyGoalRaw) {
+    try {
+      const goal = JSON.parse(familyGoalRaw);
+      setSetting('family_goal', JSON.stringify({ ...goal, started_at: nowIso() }));
+    } catch {
+      setSetting('family_goal', '');
+    }
+  }
 });
 
 /** Kid-initiated (or parent-initiated) transfer between buckets. */

@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS kids (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL,
   avatar_icon TEXT NOT NULL,
-  theme TEXT NOT NULL CHECK (theme IN ('soccer', 'dino')),
+  theme TEXT NOT NULL,
   age INTEGER NOT NULL,
   vault_mode TEXT NOT NULL DEFAULT 'manual' CHECK (vault_mode IN ('manual', 'auto_split')),
   auto_split_ratio REAL NOT NULL DEFAULT 0.7,
@@ -195,6 +195,33 @@ if (!taskColumns.includes('days')) {
 // Savings goals + reward fulfillment (v1.2).
 if (!kidColumns.includes('goal_reward_id')) {
   db.exec(`ALTER TABLE kids ADD COLUMN goal_reward_id INTEGER REFERENCES rewards_catalog(id)`);
+}
+
+// Themes beyond soccer/dino: legacy kids tables have a CHECK locking the
+// theme column — rebuild without it. Valid themes are enforced in the API.
+const kidsTableSql = db.prepare(`SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'kids'`).get().sql;
+if (kidsTableSql.includes('theme IN')) {
+  db.pragma('foreign_keys = OFF');
+  db.transaction(() => {
+    db.exec(`
+      CREATE TABLE kids_migrated (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        avatar_icon TEXT NOT NULL,
+        theme TEXT NOT NULL,
+        age INTEGER NOT NULL,
+        vault_mode TEXT NOT NULL DEFAULT 'manual' CHECK (vault_mode IN ('manual', 'auto_split')),
+        auto_split_ratio REAL NOT NULL DEFAULT 0.7,
+        secret_code TEXT,
+        goal_reward_id INTEGER REFERENCES rewards_catalog(id)
+      );
+      INSERT INTO kids_migrated (id, name, avatar_icon, theme, age, vault_mode, auto_split_ratio, secret_code, goal_reward_id)
+      SELECT id, name, avatar_icon, theme, age, vault_mode, auto_split_ratio, secret_code, goal_reward_id FROM kids;
+      DROP TABLE kids;
+      ALTER TABLE kids_migrated RENAME TO kids;
+    `);
+  })();
+  db.pragma('foreign_keys = ON');
 }
 const redemptionColumns = db.prepare(`PRAGMA table_info(redemptions)`).all().map((c) => c.name);
 if (!redemptionColumns.includes('fulfilled_at')) {

@@ -81,6 +81,31 @@ const SOUNDS = {
     tone(c, { freq: 620, endFreq: 950, start: 0.62, dur: 0.18, type: 'triangle', gain: 0.16 }); // chirp up
   },
 
+  /** Space celebration: rumble + rising launch whoosh + arrival ding. */
+  blastoff(c) {
+    tone(c, { freq: 70, endFreq: 45, dur: 0.5, type: 'sawtooth', gain: 0.16 }); // engine rumble
+    noiseBurst(c, { start: 0.05, dur: 0.8, gain: 0.12, freq: 700, q: 0.5, rise: 0.35 }); // whoosh
+    tone(c, { freq: 220, endFreq: 990, start: 0.15, dur: 0.65, type: 'triangle', gain: 0.14 }); // liftoff
+    tone(c, { freq: 1568, start: 0.85, dur: 0.3, type: 'sine', gain: 0.16 }); // in orbit!
+  },
+
+  /** Fantasy celebration: harp-like upward gliss + twinkle. */
+  magic(c) {
+    const notes = [523, 659, 784, 988, 1175, 1568]; // C5 E5 G5 B5 D6 G6
+    notes.forEach((freq, i) => tone(c, { freq, start: i * 0.08, dur: 0.4, type: 'sine', gain: 0.15 }));
+    tone(c, { freq: 2093, start: 0.55, dur: 0.4, type: 'sine', gain: 0.1 }); // twinkle
+    noiseBurst(c, { start: 0.5, dur: 0.35, gain: 0.05, freq: 5000, q: 1.5, rise: 0.05 });
+  },
+
+  /** Racing celebration: engine rev + gear shift + victory beeps. */
+  vroom(c) {
+    tone(c, { freq: 60, endFreq: 190, dur: 0.4, type: 'sawtooth', gain: 0.2 }); // rev up
+    tone(c, { freq: 90, endFreq: 240, start: 0.42, dur: 0.3, type: 'sawtooth', gain: 0.18 }); // shift
+    noiseBurst(c, { start: 0.1, dur: 0.55, gain: 0.07, freq: 1800, q: 0.6, rise: 0.1 });
+    tone(c, { freq: 880, start: 0.8, dur: 0.12, type: 'square', gain: 0.12 }); // victory beeps
+    tone(c, { freq: 1109, start: 0.95, dur: 0.25, type: 'square', gain: 0.12 });
+  },
+
   /** Mystery reveal: shimmering magic arpeggio. */
   sparkle(c) {
     const notes = [880, 1109, 1319, 1760, 2217]; // A5 C#6 E6 A6 C#7

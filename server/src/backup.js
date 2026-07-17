@@ -14,9 +14,10 @@ import { todayStr } from './dates.js';
 const KEEP = Math.max(1, Number(process.env.BACKUP_KEEP || 14));
 const BACKUP_DIR = process.env.BACKUP_DIR || path.join(path.dirname(DB_PATH), 'backups');
 
-export async function runBackup() {
+export async function runBackup(suffix = '') {
   fs.mkdirSync(BACKUP_DIR, { recursive: true });
-  const file = `reward-chart-${todayStr()}.db`;
+  // Suffixed backups (e.g. pre-fresh-start) are never auto-pruned.
+  const file = `reward-chart-${todayStr()}${suffix ? `-${suffix}` : ''}.db`;
   await db.backup(path.join(BACKUP_DIR, file));
 
   const backups = fs

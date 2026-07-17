@@ -15,7 +15,10 @@ import {
   awardPoints,
   clearBadges,
   deleteKid,
+  freshStart,
 } from '../service.js';
+
+const THEMES = ['soccer', 'dino', 'space', 'fantasy', 'racing'];
 import { vacationState, setVacation } from '../vacation.js';
 import { listBackups, runBackup } from '../backup.js';
 import { checkBadges } from '../badges.js';
@@ -145,6 +148,20 @@ parent.post('/undo', (req, res) => {
   const result = undoLastAction();
   if (!result.ok) return res.status(400).json({ error: result.reason });
   res.json(result);
+});
+
+/**
+ * Fresh start: safety backup first, then wipe all activity while keeping
+ * kids, tasks, rewards, categories, and settings.
+ */
+parent.post('/fresh-start', async (req, res) => {
+  try {
+    const backup = await runBackup('pre-fresh-start');
+    freshStart();
+    res.json({ ok: true, backup });
+  } catch (err) {
+    res.status(500).json({ error: 'fresh_start_failed', message: err.message });
+  }
 });
 
 // ---- Weekly digest ----
@@ -330,16 +347,17 @@ parent.post('/kids', (req, res) => {
     !Number.isInteger(age) ||
     age < 1 ||
     age > 18 ||
-    !['soccer', 'dino'].includes(theme)
+    !THEMES.includes(theme)
   ) {
     return res.status(400).json({ error: 'invalid_kid' });
   }
+  const defaultAvatars = { soccer: '⚽', dino: '🦖', space: '🚀', fantasy: '🦄', racing: '🏎️' };
   const info = db
     .prepare(
       `INSERT INTO kids (name, avatar_icon, theme, age, vault_mode, auto_split_ratio)
        VALUES (?, ?, ?, ?, 'manual', 0.7)`
     )
-    .run(name.trim(), avatar_icon || (theme === 'dino' ? '🦖' : '⚽'), theme, age);
+    .run(name.trim(), avatar_icon || defaultAvatars[theme], theme, age);
   res.status(201).json(db.prepare(`SELECT * FROM kids WHERE id = ?`).get(info.lastInsertRowid));
 });
 
@@ -365,6 +383,9 @@ parent.patch('/kids/:id', (req, res) => {
   if (!['manual', 'auto_split'].includes(vault_mode) || typeof ratio !== 'number' || ratio <= 0 || ratio >= 1) {
     return res.status(400).json({ error: 'invalid_vault_config' });
   }
+  const theme = req.body.theme ?? kid.theme;
+  if (!THEMES.includes(theme)) return res.status(400).json({ error: 'invalid_theme' });
+  const avatar_icon = req.body.avatar_icon ?? kid.avatar_icon;
   // secret_code: emoji string enables the kid lock; null/'' disables it.
   let secret_code = kid.secret_code;
   if (req.body.secret_code !== undefined) {
@@ -373,12 +394,9 @@ parent.patch('/kids/:id', (req, res) => {
     else if (typeof code === 'string' && code.length <= 24) secret_code = code;
     else return res.status(400).json({ error: 'invalid_secret_code' });
   }
-  db.prepare(`UPDATE kids SET vault_mode = ?, auto_split_ratio = ?, secret_code = ? WHERE id = ?`).run(
-    vault_mode,
-    ratio,
-    secret_code,
-    kid.id
-  );
+  db.prepare(
+    `UPDATE kids SET vault_mode = ?, auto_split_ratio = ?, secret_code = ?, theme = ?, avatar_icon = ? WHERE id = ?`
+  ).run(vault_mode, ratio, secret_code, theme, avatar_icon, kid.id);
   res.json(db.prepare(`SELECT * FROM kids WHERE id = ?`).get(kid.id));
 });
 
