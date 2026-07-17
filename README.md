@@ -58,8 +58,10 @@ points land → celebrate.*
   [ntfy](https://ntfy.sh).
 
 **Under the hood:**
-- Offline-tolerant kiosk — task taps queue in the browser and sync when the connection
-  returns.
+- **Installable PWA** — add it to a tablet or phone home screen and it launches
+  full-screen with its own icon, named after your chart. A service worker keeps the
+  kiosk rendering through network blips (last-known data), and task taps queue in the
+  browser and sync when the connection returns.
 - Five fully-realized themes driven by a single config object, so adding a sixth is a
   data change, not a rewrite.
 - Everything is a single SQLite file on a mounted volume; schema migrations run
@@ -77,8 +79,9 @@ docker compose up -d --build
 
 Open **http://localhost:8090** (or `http://<server-ip>:8090` from another device on your
 network) and the **first-run setup wizard** walks you through naming the chart, choosing a
-parent PIN, and adding your first child — no config files to edit. Add the tablet's URL to
-its home screen for a full-screen kiosk.
+parent PIN, and adding your first child — no config files to edit. Then use **Add to Home
+Screen** on the kiosk tablet and any phones — it installs as a proper full-screen app with
+its own icon.
 
 A pre-built image is also published to GHCR, so you can skip the build:
 

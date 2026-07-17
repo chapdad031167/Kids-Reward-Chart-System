@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { DB_PATH } from './db.js';
 import { ensureBonusPool } from './seed.js';
-import { isConfigured } from './config.js';
+import { isConfigured, getAppName } from './config.js';
 import { scheduleBackups } from './backup.js';
 import { scheduleDigest } from './digest.js';
 import { kiosk } from './routes/kiosk.js';
@@ -34,12 +34,35 @@ const staticDir =
     (dir) => fs.existsSync(path.join(dir, 'index.html'))
   );
 if (staticDir && fs.existsSync(staticDir)) {
-  // index.html must always revalidate so phones pick up new releases;
-  // hashed bundle files are immutable and can cache forever.
+  // The manifest is generated so the installed app carries the family's
+  // chosen chart name and stays current after a rename in Settings.
+  app.get('/manifest.webmanifest', (req, res) => {
+    const name = getAppName();
+    res.setHeader('Cache-Control', 'no-cache');
+    res.type('application/manifest+json').json({
+      name,
+      short_name: name.length <= 12 ? name : 'Rewards',
+      description: 'A self-hosted chore & reward chart for families',
+      start_url: '/',
+      scope: '/',
+      display: 'standalone',
+      orientation: 'any',
+      background_color: '#16324a',
+      theme_color: '#16324a',
+      icons: [
+        { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' },
+        { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png' },
+        { src: '/icons/icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+      ],
+    });
+  });
+
+  // index.html and the service worker must always revalidate so devices
+  // pick up new releases; hashed bundles are immutable and cache forever.
   app.use(
     express.static(staticDir, {
       setHeaders: (res, filePath) => {
-        if (filePath.endsWith('.html')) {
+        if (filePath.endsWith('.html') || filePath.endsWith('sw.js')) {
           res.setHeader('Cache-Control', 'no-cache');
         } else if (filePath.includes(`${path.sep}assets${path.sep}`)) {
           res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
