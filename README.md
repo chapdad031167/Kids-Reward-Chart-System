@@ -6,7 +6,7 @@ world (soccer, dinosaur, space, fantasy, or racing) with its own colors, celebra
 sounds, and vocabulary. Runs entirely on your own hardware; your family's data never
 leaves the house.
 
-**[▶ Try the live demo](https://claude.ai/code/artifact/a01a6552-1d54-463d-9a77-dc4ee6ce7f07)** — a full in-browser build, parent PIN `1234`, add `?reset` to start over.
+**[▶ Try the live demo](https://chapdad031167.github.io/Kids-Reward-Chart-System/)** — a full in-browser build, parent PIN `1234`, add `?reset` to start over.
 
 <p align="center">
   <img src="docs/screenshots/avatar-select.png" width="49%" alt="Avatar select screen with themed kids" />
