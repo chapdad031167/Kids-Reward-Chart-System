@@ -1,19 +1,22 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { playSound } from '../sounds.js';
 
 const CONFETTI_COLORS = ['#f5c518', '#ffffff', '#2e9e56', '#f59e0b', '#63b3ed', '#f687b3'];
 
-function Confetti() {
+/** One in ten celebrations is a big one — rare enough to stay a surprise. */
+const BIG_CHANCE = 0.1;
+
+function Confetti({ count }) {
   return (
     <>
-      {Array.from({ length: 18 }, (_, i) => (
+      {Array.from({ length: count }, (_, i) => (
         <span
           key={i}
           className="confetti"
           style={{
-            left: `${5 + ((i * 53) % 90)}%`,
+            left: `${3 + ((i * 37) % 94)}%`,
             background: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
-            animationDelay: `${(i % 6) * 0.09}s`,
+            animationDelay: `${(i % 8) * 0.08}s`,
           }}
         />
       ))}
@@ -23,17 +26,27 @@ function Confetti() {
 
 /** Full-screen celebration: themed animation plus a themed jingle. */
 export default function Celebration({ theme, onDone }) {
+  // Chosen once per celebration — re-rolling on every render would make the
+  // words flicker mid-animation.
+  const [{ word, sub, big }] = useState(() => {
+    const pool = theme.terms.cheers?.length
+      ? theme.terms.cheers
+      : [[theme.terms.celebration, theme.terms.celebrationSub]];
+    const [w, s] = pool[Math.floor(Math.random() * pool.length)];
+    return { word: w, sub: s, big: Math.random() < BIG_CHANCE };
+  });
+
   useEffect(() => {
     playSound(theme.sound);
-    const t = setTimeout(onDone, 2200);
+    const t = setTimeout(onDone, big ? 3400 : 2200);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [onDone]);
 
   return (
     <div className="celebration-overlay" onClick={onDone}>
-      <div className="celebration-stage">
-        <Confetti />
+      <div className={`celebration-stage${big ? ' big' : ''}`}>
+        <Confetti count={big ? 44 : 18} />
         {theme.celebration === 'soccer' && (
           <>
             <span className="goal-net">🥅</span>
@@ -65,8 +78,9 @@ export default function Celebration({ theme, onDone }) {
             <span className="race-car">🏎️</span>
           </>
         )}
-        <div className="celebration-word">{theme.terms.celebration}</div>
-        <div className="celebration-sub">{theme.terms.celebrationSub}</div>
+        {big && <div className="celebration-flag">⭐ BIG ONE ⭐</div>}
+        <div className="celebration-word">{word}</div>
+        <div className="celebration-sub">{sub}</div>
       </div>
     </div>
   );

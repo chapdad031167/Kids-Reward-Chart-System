@@ -89,7 +89,10 @@ export default function KidHome() {
     '--meter-fill': theme.colors.meterFill,
     '--chip': theme.colors.chip,
     '--header-text': theme.colors.headerText,
-    background: theme.colors.bg,
+    // Texture first so it sits above the gradient in the layer stack.
+    background: theme.colors.texture
+      ? `${theme.colors.texture}, ${theme.colors.bg}`
+      : theme.colors.bg,
   };
 
   async function onTapTask(task) {

@@ -1,3 +1,28 @@
+/**
+ * Baloo 2 (SIL OFL 1.1 — see assets/fonts/OFL.txt), self-hosted so the app
+ * keeps its no-internet promise. One variable file covers 400–800, so the
+ * whole display range costs 33KB and a single request. Vite hashes it into
+ * /assets/, which the service worker already caches first.
+ *
+ * The old stack was 'Segoe UI', 'Comic Sans MS', system-ui — which rendered
+ * as three different fonts on three different devices (Segoe is Windows-only,
+ * iPads fell through to system-ui) and read as "default app" on all of them.
+ */
+@font-face {
+  font-family: 'Baloo 2';
+  src: url('./assets/fonts/baloo2-latin.woff2') format('woff2-variations');
+  font-weight: 400 800;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  /* Display face: kid screens, headings, anything with personality. */
+  --font-display: 'Baloo 2', 'Trebuchet MS', system-ui, sans-serif;
+  /* Body face: dense parent-side text, where legibility beats character. */
+  --font-body: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
 * {
   box-sizing: border-box;
   -webkit-tap-highlight-color: transparent;
@@ -9,7 +34,7 @@ body,
   margin: 0;
   padding: 0;
   min-height: 100vh;
-  font-family: 'Segoe UI', 'Comic Sans MS', system-ui, sans-serif;
+  font-family: var(--font-display);
 }
 
 body {
@@ -51,7 +76,11 @@ button {
   align-items: center;
   justify-content: center;
   gap: 32px;
-  background: linear-gradient(160deg, #16324a 0%, #1e4d6b 60%, #16324a 100%);
+  /* Faint starfield over the gradient — the front door gets a sky rather
+     than a flat panel, without committing it to any one kid's theme. */
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cg fill='%23ffffff'%3E%3Ccircle cx='24' cy='36' r='1.5' opacity='0.35'/%3E%3Ccircle cx='96' cy='18' r='1' opacity='0.22'/%3E%3Ccircle cx='158' cy='52' r='1.6' opacity='0.32'/%3E%3Ccircle cx='52' cy='104' r='1.1' opacity='0.25'/%3E%3Ccircle cx='132' cy='128' r='1' opacity='0.2'/%3E%3Ccircle cx='184' cy='158' r='1.4' opacity='0.3'/%3E%3Ccircle cx='36' cy='172' r='1' opacity='0.22'/%3E%3C/g%3E%3C/svg%3E"),
+    linear-gradient(160deg, #16324a 0%, #1e4d6b 60%, #16324a 100%);
   padding: 24px;
 }
 
@@ -90,9 +119,62 @@ button {
   transform: scale(0.95);
 }
 
+/* The theme texture, painted over the tile's gradient without replacing it.
+   Sits behind the contents so the emoji and teasers stay crisp. */
+.avatar-btn {
+  position: relative;
+  overflow: hidden;
+}
+
+.avatar-btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: var(--tile-texture, none);
+  pointer-events: none;
+}
+
+.avatar-btn > * {
+  position: relative;
+}
+
 .avatar-btn .avatar-emoji {
-  font-size: clamp(72px, 12vw, 120px);
+  font-size: clamp(64px, 10vw, 104px);
   animation: bob 2.4s ease-in-out infinite;
+}
+
+/* Teasers turn the front door from a name-picker into a reason to tap. */
+.avatar-teasers {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-top: 2px;
+}
+
+.teaser {
+  font-size: 15px;
+  font-weight: 700;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.28);
+  color: #fff;
+  line-height: 1.2;
+}
+
+.teaser.waiting {
+  background: rgba(255, 255, 255, 0.92);
+  color: #1a202c;
+}
+
+.teaser.done {
+  background: #ffffff;
+  color: #276749;
+}
+
+.teaser.flame {
+  background: rgba(255, 159, 28, 0.95);
+  color: #3d2000;
 }
 
 .avatar-btn.soccer {
@@ -101,7 +183,9 @@ button {
 }
 
 .avatar-btn.dino {
-  background: linear-gradient(160deg, #1f7a5c, #d97706);
+  /* Was green→orange, which met in a muddy khaki halfway down the tile.
+     Staying in the jungle-green family keeps the amber for the border. */
+  background: linear-gradient(160deg, #1f7a5c, #14654f);
   border: 4px solid #fbc963;
 }
 
@@ -1092,6 +1176,26 @@ button {
   font-weight: 700;
   margin-top: 6px;
   z-index: 2;
+  text-align: center;
+  padding: 0 12px;
+}
+
+/* The rare big one: everything a size up, plus a banner announcing it. */
+.celebration-stage.big .celebration-word {
+  font-size: clamp(56px, 15vw, 96px);
+}
+
+.celebration-flag {
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  color: #fff;
+  background: linear-gradient(90deg, #f59e0b, #f5c518, #f59e0b);
+  padding: 6px 18px;
+  border-radius: 999px;
+  margin-bottom: 10px;
+  z-index: 2;
+  animation: word-pop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 @keyframes word-pop {
@@ -1404,6 +1508,18 @@ button {
   min-height: 100vh;
   background: #f0f4f2;
   padding-bottom: 60px;
+  /* The parent side is dense working text — tables, filenames, digest
+     output. System UI reads better here than the display face; headings
+     opt back into it below so the app still feels of a piece. */
+  font-family: var(--font-body);
+}
+
+.parent-shell h1,
+.parent-shell h2,
+.parent-shell h3,
+.parent-shell h4,
+.parent-shell .btn {
+  font-family: var(--font-display);
 }
 
 .parent-topbar {
@@ -1442,6 +1558,22 @@ button {
 .parent-tab.active {
   background: #fff;
   color: #1e4d6b;
+}
+
+/* Live count of what's waiting, visible from any tab. */
+.tab-badge {
+  display: inline-block;
+  min-width: 22px;
+  margin-left: 8px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: #e53e3e;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 20px;
+  text-align: center;
+  vertical-align: middle;
 }
 
 .parent-content {
@@ -1764,6 +1896,45 @@ button {
   font-size: 14px;
   line-height: 1.5;
   color: #713f12;
+}
+
+/* Kid card actions: a wrapping row with the destructive pair set apart by a
+   rule, so "Remove kid" never sits flush against "History". */
+.kid-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-top: 14px;
+}
+
+.kid-actions .btn {
+  font-size: 14px;
+  padding: 9px 14px;
+  min-height: 44px;
+  /* .btn.secondary carries flex:1 for full-width stacks elsewhere; here the
+     buttons should size to their labels instead of stretching edge to edge. */
+  flex: 0 0 auto;
+}
+
+.kid-actions-danger {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-left: auto;
+  padding-left: 14px;
+  border-left: 2px solid #e2e8f0;
+}
+
+@media (max-width: 720px) {
+  .kid-actions-danger {
+    margin-left: 0;
+    padding-left: 0;
+    border-left: none;
+    border-top: 2px solid #e2e8f0;
+    padding-top: 10px;
+    width: 100%;
+  }
 }
 
 /* Kid avatar in the parent list, doubling as the "change avatar" control. */
