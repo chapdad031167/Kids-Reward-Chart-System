@@ -53,7 +53,11 @@ export default function AvatarSelect({ appName = 'Reward Chart' }) {
           <button key={kid.id} className={`avatar-btn ${kid.theme}`} onClick={() => onTapAvatar(kid)}>
             <span className="avatar-emoji">{kid.avatar_icon}</span>
             {kid.name}
-            {kid.has_code && <span className="avatar-lock">🔒</span>}
+            {kid.has_code && (
+              <span className="avatar-lock" role="img" aria-label="has a secret code">
+                🔒
+              </span>
+            )}
           </button>
         ))}
       </div>

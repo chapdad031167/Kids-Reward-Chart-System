@@ -395,6 +395,8 @@ function PendingTab({ client, notify }) {
   // Yesterday's taps stay approvable through today, so say which day a row is
   // from — approving it credits that day and keeps the streak intact.
   const todayKey = new Date().toLocaleDateString('en-CA');
+  // Reject sits next to approve and isn't covered by undo, so it asks first.
+  const [confirmingReject, setConfirmingReject] = useState(null);
 
   const load = useCallback(() => {
     client.get('/api/parent/pending').then(setData).catch(() => notify('Failed to load queue'));
@@ -418,9 +420,11 @@ function PendingTab({ client, notify }) {
   }
 
   if (!data) return 'Loading…';
+  const rejected = data.rejected || [];
   const empty =
     data.completions.length === 0 &&
     data.redemptions.length === 0 &&
+    rejected.length === 0 &&
     (data.toDeliver || []).length === 0;
 
   return (
@@ -451,13 +455,15 @@ function PendingTab({ client, notify }) {
           </span>
           <button
             className="icon-btn approve"
+            aria-label={`Approve ${c.title} for ${c.kid_name}`}
             onClick={() => act(`/api/parent/completions/${c.id}/approve`, `Approved: ${c.title}`)}
           >
             ✅
           </button>
           <button
             className="icon-btn reject"
-            onClick={() => act(`/api/parent/completions/${c.id}/reject`, `Rejected: ${c.title}`)}
+            aria-label={`Reject ${c.title} for ${c.kid_name}`}
+            onClick={() => setConfirmingReject(c)}
           >
             ❌
           </button>
@@ -473,12 +479,14 @@ function PendingTab({ client, notify }) {
           </span>
           <button
             className="icon-btn approve"
+            aria-label={`Approve reward ${r.title} for ${r.kid_name}`}
             onClick={() => act(`/api/parent/redemptions/${r.id}/approve`, `Approved reward: ${r.title}`)}
           >
             ✅
           </button>
           <button
             className="icon-btn reject"
+            aria-label={`Reject reward ${r.title} for ${r.kid_name}`}
             onClick={() => act(`/api/parent/redemptions/${r.id}/reject`, `Rejected reward: ${r.title}`)}
           >
             ❌
@@ -503,6 +511,54 @@ function PendingTab({ client, notify }) {
           </button>
         </div>
       ))}
+
+      {rejected.length > 0 && <h3>↩ Sent back</h3>}
+      {rejected.map((c) => (
+        <div key={`x${c.id}`} className="pending-item">
+          <span className="who">{c.kid_name}</span>
+          <span className="what">
+            {c.icon} {c.title}
+            {c.date !== todayKey && <span className="day-tag">Yesterday</span>}
+            <br />
+            <small>rejected {new Date(c.reviewed_at).toLocaleTimeString()}</small>
+          </span>
+          <button
+            className="btn secondary"
+            aria-label={`Let ${c.kid_name} redo ${c.title}`}
+            onClick={() => act(`/api/parent/completions/${c.id}/reopen`, `${c.kid_name} can redo ${c.title}`)}
+          >
+            Let them redo it
+          </button>
+        </div>
+      ))}
+
+      {confirmingReject && (
+        <Modal title="Reject this?" onClose={() => setConfirmingReject(null)}>
+          <p>
+            Send back <strong>{confirmingReject.title}</strong> for{' '}
+            <strong>{confirmingReject.kid_name}</strong>? They won't get the{' '}
+            {confirmingReject.point_value} points.
+          </p>
+          <p style={{ fontSize: 14, color: '#4a5568' }}>
+            Undo doesn't cover rejections, but you can put it back from the "Sent back" list below.
+          </p>
+          <div className="modal-actions">
+            <button className="btn secondary" onClick={() => setConfirmingReject(null)}>
+              Cancel
+            </button>
+            <button
+              className="btn danger"
+              onClick={() => {
+                const c = confirmingReject;
+                setConfirmingReject(null);
+                act(`/api/parent/completions/${c.id}/reject`, `Rejected: ${c.title}`);
+              }}
+            >
+              Reject
+            </button>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }
@@ -585,7 +641,7 @@ function TasksTab({ client, notify }) {
                 <td>{categories.find((c) => c.id === t.category_id)?.label || '—'}</td>
                 <td>{t.is_bonus ? '✨ Mystery' : scheduleSummary(t.days)}</td>
                 <td>{t.point_value}</td>
-                <td>{t.kid_id ? kids.find((k) => k.id === t.kid_id)?.name || t.kid_id : 'Both'}</td>
+                <td>{t.kid_id ? kids.find((k) => k.id === t.kid_id)?.name || t.kid_id : 'All kids'}</td>
                 <td>
                   <button className="btn secondary" onClick={() => setEditing({ ...t })}>
                     Edit
@@ -730,7 +786,7 @@ function TaskForm({ task, kids, categories, onSave, onClose }) {
         <label>
           Applies to
           <select value={form.kid_id ?? ''} onChange={(e) => setForm({ ...form, kid_id: e.target.value || null })}>
-            <option value="">Both kids</option>
+            <option value="">All kids</option>
             {kids.map((k) => (
               <option key={k.id} value={k.id}>
                 {k.name} only
@@ -823,7 +879,7 @@ function RewardsTab({ client, notify }) {
                 </td>
                 <td>{r.cost}</td>
                 <td>{r.bucket_required}</td>
-                <td>{r.kid_id ? kids.find((k) => k.id === r.kid_id)?.name || r.kid_id : 'Both'}</td>
+                <td>{r.kid_id ? kids.find((k) => k.id === r.kid_id)?.name || r.kid_id : 'All kids'}</td>
                 <td>
                   <button className="btn secondary" onClick={() => setEditing({ ...r })}>
                     Edit
@@ -875,7 +931,7 @@ function RewardForm({ reward, kids, onSave, onClose }) {
         <label>
           Available to
           <select value={form.kid_id ?? ''} onChange={(e) => setForm({ ...form, kid_id: e.target.value || null })}>
-            <option value="">Both kids</option>
+            <option value="">All kids</option>
             {kids.map((k) => (
               <option key={k.id} value={k.id}>
                 {k.name} only
@@ -912,6 +968,7 @@ function KidsTab({ client, notify }) {
   const [addingKid, setAddingKid] = useState(false);
   const [clearingBadges, setClearingBadges] = useState(null); // kid
   const [removingKid, setRemovingKid] = useState(null); // kid
+  const [editingAvatar, setEditingAvatar] = useState(null); // kid
   const [freshStarting, setFreshStarting] = useState(false);
 
   const load = useCallback(() => {
@@ -1046,6 +1103,18 @@ function KidsTab({ client, notify }) {
         />
       )}
 
+      {editingAvatar && (
+        <AvatarModal
+          kid={editingAvatar}
+          client={client}
+          notify={notify}
+          onClose={() => {
+            setEditingAvatar(null);
+            load();
+          }}
+        />
+      )}
+
       {digestPreview !== null && (
         <Modal title="📊 Weekly digest" onClose={() => setDigestPreview(null)}>
           <pre style={{ whiteSpace: 'pre-wrap', fontFamily: 'inherit', fontSize: 14, lineHeight: 1.5 }}>
@@ -1098,7 +1167,14 @@ function KidsTab({ client, notify }) {
 
       {kids.map((kid) => (
         <div key={kid.id} className="pending-item" style={{ alignItems: 'flex-start' }}>
-          <span style={{ fontSize: 34 }}>{kid.avatar_icon}</span>
+          <button
+            className="avatar-edit-btn"
+            aria-label={`Change ${kid.name}'s avatar`}
+            title="Change avatar"
+            onClick={() => setEditingAvatar(kid)}
+          >
+            {kid.avatar_icon}
+          </button>
           <span className="what">
             <strong style={{ fontSize: 17 }}>
               {kid.name} (age {kid.age})
@@ -1114,7 +1190,9 @@ function KidsTab({ client, notify }) {
                   onChange={async (e) => {
                     const o = THEME_OPTIONS.find((x) => x.key === e.target.value);
                     try {
-                      await client.patch(`/api/parent/kids/${kid.id}`, { theme: o.key, avatar_icon: o.avatar });
+                      // Theme only — sending the theme's default avatar too
+                      // used to wipe whatever avatar the kid had picked.
+                      await client.patch(`/api/parent/kids/${kid.id}`, { theme: o.key });
                       notify(`${kid.name} is now ${o.label}!`);
                     } catch {
                       notify('Theme change failed');
@@ -1327,6 +1405,42 @@ const THEME_OPTIONS = [
   { key: 'racing', label: '🏎️ Racing', avatar: '🏎️' },
 ];
 
+/**
+ * Change a kid's avatar after creation. There was no way to do this at all
+ * before — the only avatar choice happened at add-time, and a theme change
+ * silently overwrote it.
+ */
+function AvatarModal({ kid, client, notify, onClose }) {
+  const [icon, setIcon] = useState(kid.avatar_icon);
+  const [saving, setSaving] = useState(false);
+
+  async function save() {
+    setSaving(true);
+    try {
+      await client.patch(`/api/parent/kids/${kid.id}`, { avatar_icon: icon });
+      notify(`${kid.name}'s avatar updated`);
+      onClose();
+    } catch {
+      notify('Could not change the avatar');
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Modal title={`${kid.name}'s avatar`} onClose={onClose}>
+      <EmojiPicker value={icon} onChange={setIcon} />
+      <div className="modal-actions">
+        <button className="btn secondary" onClick={onClose}>
+          Cancel
+        </button>
+        <button className="btn primary" onClick={save} disabled={saving || icon === kid.avatar_icon}>
+          Save
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
 function AddKidModal({ client, notify, onClose }) {
   const [name, setName] = useState('');
   const [age, setAge] = useState('');
@@ -1388,7 +1502,7 @@ function AddKidModal({ client, notify, onClose }) {
       </div>
       <p style={{ fontSize: 13, color: '#4a5568' }}>
         Starts in manual vault mode with no secret code — adjust both here in Kids & Vaults
-        after adding. Tasks assigned to "Both kids" apply automatically.
+        after adding. Tasks assigned to "All kids" apply automatically.
       </p>
       <div className="modal-actions">
         <button className="btn secondary" onClick={onClose}>
@@ -1540,11 +1654,12 @@ function AwardModal({ kids, client, notify, onClose }) {
       <div className="form-grid">
         <label>
           Who gets it?
-          <span style={{ display: 'flex', gap: 10, marginTop: 4 }}>
+          <span style={{ display: 'flex', gap: 10, marginTop: 4, flexWrap: 'wrap' }}>
             {kids.map((k) => (
               <button
                 type="button"
                 key={k.id}
+                aria-pressed={selected.has(k.id)}
                 className={`btn ${selected.has(k.id) ? 'primary' : 'secondary'}`}
                 onClick={() => toggle(k.id)}
               >
@@ -1668,11 +1783,38 @@ function AdjustModal({ kid, onSave, onClose }) {
   );
 }
 
+/**
+ * Turn a raw ledger `source` into something a parent can read.
+ * Completions and redemptions get their own sections above, so this only
+ * has to explain the point movements that have no other home.
+ */
+function ledgerLabel(source) {
+  if (!source) return 'Adjustment';
+  if (source === 'adjustment') return 'Manual adjustment';
+  if (source === 'transfer') return 'Vault transfer';
+  if (source.startsWith('badge:')) return `Badge bonus — ${source.slice(6).replace(/[-_]/g, ' ')}`;
+  if (source.startsWith('award:')) {
+    const note = source.slice(6);
+    return note && note !== 'bonus' ? `Bonus — ${note}` : 'Bonus points';
+  }
+  return source;
+}
+
+/** Entries with no other section: awards, adjustments, transfers, badges. */
+function otherLedgerEntries(ledger) {
+  return (ledger || []).filter(
+    (l) => !l.source?.startsWith('completion:') && !l.source?.startsWith('redemption:')
+  );
+}
+
 function HistoryModal({ history, onClose }) {
+  const adjustments = otherLedgerEntries(history.data.ledger);
   return (
     <Modal title={`${history.kid.name}'s history`} onClose={onClose}>
           <div className="history-list">
-            {history.data.completions.length === 0 && <p>No activity yet.</p>}
+            {history.data.completions.length === 0 &&
+              history.data.redemptions.length === 0 &&
+              adjustments.length === 0 && <p>No activity yet.</p>}
             {history.data.completions.map((c) => (
               <div key={c.id} className="history-row">
                 <span>{c.date}</span>
@@ -1690,6 +1832,20 @@ function HistoryModal({ history, onClose }) {
                   {r.icon} {r.title} (−{r.cost_paid})
                 </span>
                 <span className={`status-pill ${r.status}`}>{r.status}</span>
+              </div>
+            ))}
+            {adjustments.length > 0 && <h4>Bonuses &amp; adjustments</h4>}
+            {adjustments.map((l) => (
+              <div key={`l${l.id}`} className="history-row">
+                <span>{l.created_at.slice(0, 10)}</span>
+                <span style={{ flex: 1 }}>
+                  {ledgerLabel(l.source)}{' '}
+                  <span style={{ color: '#718096' }}>({l.bucket})</span>
+                </span>
+                <span className={l.direction === 'earn' ? 'ledger-plus' : 'ledger-minus'}>
+                  {l.direction === 'earn' ? '+' : '−'}
+                  {l.amount}
+                </span>
               </div>
             ))}
           </div>

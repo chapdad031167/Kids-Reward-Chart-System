@@ -45,6 +45,34 @@ export function displayStreak(streakRow, taskDays = null) {
   return 0;
 }
 
+/**
+ * Points already committed to redemptions the parent hasn't ruled on yet.
+ *
+ * A pending request is a hold, not a spend — nothing leaves the ledger until
+ * approval. Anything deciding what a kid can afford has to subtract these, or
+ * the same points get promised twice and the second approval fails at the
+ * till.
+ */
+export function pendingHolds(kidId) {
+  const rows = db
+    .prepare(
+      `SELECT rc.bucket_required AS bucket, COALESCE(SUM(r.cost_paid), 0) AS total
+       FROM redemptions r JOIN rewards_catalog rc ON rc.id = r.reward_id
+       WHERE r.kid_id = ? AND r.status = 'pending' GROUP BY rc.bucket_required`
+    )
+    .all(kidId);
+  const held = { checking: 0, savings: 0 };
+  for (const r of rows) held[r.bucket] = r.total;
+  return held;
+}
+
+/** What a kid can actually commit right now: balance minus pending holds. */
+export function spendableBalance(kidId) {
+  const bal = balances(kidId);
+  const held = pendingHolds(kidId);
+  return { checking: bal.checking - held.checking, savings: bal.savings - held.savings };
+}
+
 /** Split an earned amount into buckets per the kid's vault config. */
 export function splitEarnings(kid, amount) {
   if (kid.vault_mode !== 'auto_split') return { checking: amount, savings: 0 };
@@ -144,6 +172,21 @@ export const rejectCompletion = db.transaction((completionId) => {
   const info = db
     .prepare(`UPDATE completions SET status = 'rejected', reviewed_at = ? WHERE id = ? AND status = 'pending'`)
     .run(nowIso(), completionId);
+  return info.changes > 0;
+});
+
+/**
+ * Undo a rejection so the kid can have another go.
+ *
+ * UNIQUE (task_id, kid_id, date) means a rejected row blocks that task for the
+ * rest of the day, so "you missed a spot — do it again" had no path back short
+ * of Reset Day, which wipes the kid's whole day. Deleting the row rather than
+ * flipping it to pending is deliberate: it puts the task back on the kid's
+ * chart to actually redo, instead of putting un-redone work in front of the
+ * parent to approve.
+ */
+export const reopenCompletion = db.transaction((completionId) => {
+  const info = db.prepare(`DELETE FROM completions WHERE id = ? AND status = 'rejected'`).run(completionId);
   return info.changes > 0;
 });
 

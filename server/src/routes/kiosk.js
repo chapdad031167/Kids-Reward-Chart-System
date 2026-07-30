@@ -1,7 +1,13 @@
 import { Router } from 'express';
 import { db, balances } from '../db.js';
 import { todayStr, nowIso } from '../dates.js';
-import { expireStalePending, displayStreak, transferPoints } from '../service.js';
+import {
+  expireStalePending,
+  displayStreak,
+  transferPoints,
+  pendingHolds,
+  spendableBalance,
+} from '../service.js';
 import { notifyParent } from '../notify.js';
 import { getBonusForToday, revealBonus } from '../bonus.js';
 import { vacationState } from '../vacation.js';
@@ -217,15 +223,7 @@ kiosk.get('/kids/:id/rewards', (req, res) => {
   if (!kid) return res.status(404).json({ error: 'kid_not_found' });
 
   const bal = balances(kid.id);
-  const pendingSpend = db
-    .prepare(
-      `SELECT rc.bucket_required AS bucket, COALESCE(SUM(r.cost_paid), 0) AS total
-       FROM redemptions r JOIN rewards_catalog rc ON rc.id = r.reward_id
-       WHERE r.kid_id = ? AND r.status = 'pending' GROUP BY rc.bucket_required`
-    )
-    .all(kid.id);
-  const held = { checking: 0, savings: 0 };
-  for (const p of pendingSpend) held[p.bucket] = p.total;
+  const held = pendingHolds(kid.id);
 
   const rewards = db
     .prepare(
@@ -251,8 +249,10 @@ kiosk.post('/redemptions', (req, res) => {
     return res.status(400).json({ error: 'reward_not_available_to_kid' });
   }
 
-  const bal = balances(kid.id);
-  if (bal[reward.bucket_required] < reward.cost) {
+  // Against spendable, not raw balance: the rewards list already greys out
+  // what a kid can't afford after holds, so accepting it here anyway would
+  // queue a request that can only fail later at parent approval.
+  if (spendableBalance(kid.id)[reward.bucket_required] < reward.cost) {
     return res.status(400).json({ error: 'insufficient_points' });
   }
 

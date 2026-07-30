@@ -4,6 +4,7 @@ import {
   expireStalePending,
   approveCompletion,
   rejectCompletion,
+  reopenCompletion,
   approveRedemption,
   rejectRedemption,
   approveAllPending,
@@ -119,7 +120,30 @@ parent.get('/pending', (req, res) => {
        ORDER BY r.reviewed_at`
     )
     .all();
-  res.json({ completions, redemptions, toDeliver });
+  // Recently rejected, so "do it again" has somewhere to be undone from.
+  const rejected = db
+    .prepare(
+      `SELECT c.id, c.date, c.reviewed_at, k.name AS kid_name, k.id AS kid_id,
+              t.title, t.icon, t.point_value
+       FROM completions c
+       JOIN kids k ON k.id = c.kid_id
+       JOIN tasks t ON t.id = c.task_id
+       WHERE c.status = 'rejected' AND c.date >= ?
+       ORDER BY c.reviewed_at`
+    )
+    .all(oldestApprovableDate());
+  res.json({ completions, redemptions, toDeliver, rejected });
+});
+
+/**
+ * Undo a rejection. Removes the completion so the task returns to the kid's
+ * chart and they can redo the work and tap again.
+ */
+parent.post('/completions/:id/reopen', (req, res) => {
+  if (!reopenCompletion(Number(req.params.id))) {
+    return res.status(400).json({ error: 'not_rejected' });
+  }
+  res.json({ ok: true });
 });
 
 /** Mark an approved reward as actually delivered to the kid. */
