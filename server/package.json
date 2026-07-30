@@ -6,7 +6,8 @@
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",
-    "seed": "node src/seed.js"
+    "seed": "node src/seed.js",
+    "test": "DATA_DIR=$(mktemp -d) node test/p0.test.mjs"
   },
   "dependencies": {
     "better-sqlite3": "^12.11.1",
