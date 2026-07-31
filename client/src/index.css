@@ -987,6 +987,17 @@ button {
   font-size: 30px;
 }
 
+.level-block {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  /* Wide enough for the bar to read as a measure, narrow enough that it
+     stays a subtitle to the greeting rather than competing with it. */
+  max-width: 260px;
+  width: 100%;
+}
+
 .level-chip {
   align-self: flex-start;
   background: rgba(255, 255, 255, 0.22);
@@ -996,6 +1007,38 @@ button {
   padding: 3px 12px;
   border-radius: 10px;
   letter-spacing: 0.3px;
+}
+
+/* The gap to the next level. The numbers were already being sent and
+   ignored; a kid seeing "Lv 4" for a week has no sense of moving. */
+.level-bar {
+  display: block;
+  width: 100%;
+  height: 7px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.22);
+  overflow: hidden;
+}
+
+.level-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent, #fff);
+  transition: width 0.5s ease;
+}
+
+.level-next {
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
+  opacity: 0.85;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .level-bar-fill {
+    transition: none;
+  }
 }
 
 .badges-btn {

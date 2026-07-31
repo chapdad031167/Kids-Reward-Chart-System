@@ -350,6 +350,7 @@ function SettingsTab({ client, notify, onAppNameChange }) {
   const [pin, setPinValue] = useState('');
   const [pin2, setPin2] = useState('');
   const [publicUrl, setPublicUrl] = useState('');
+  const [quiet, setQuiet] = useState({ on: false, start: '19:30', end: '07:00' });
   const [breakDays, setBreakDays] = useState([]);
   const [newBreak, setNewBreak] = useState({ date: '', label: '' });
 
@@ -360,6 +361,7 @@ function SettingsTab({ client, notify, onAppNameChange }) {
         setAppName(s.appName);
         setUsingDefaultPin(!!s.usingDefaultPin);
         setPublicUrl(s.publicUrl || '');
+        if (s.quietHours) setQuiet(s.quietHours);
         setLoaded(true);
       })
       .catch(() => notify('Failed to load settings'));
@@ -406,6 +408,19 @@ function SettingsTab({ client, notify, onAppNameChange }) {
       notify(r.publicUrl ? 'Approve buttons enabled in notifications' : 'Approve buttons turned off');
     } catch {
       notify('That does not look like a URL — include http:// or https://');
+    }
+  }
+
+  async function saveQuiet(next) {
+    // Optimistic so the toggle feels instant; the reload below is the truth.
+    setQuiet(next);
+    try {
+      const r = await client.post('/api/parent/settings', { quietHours: next });
+      setQuiet(r.quietHours);
+      notify(next.on ? `Quiet hours ${next.start}–${next.end}` : 'Quiet hours off');
+    } catch {
+      notify('That time window did not make sense — check the start and end');
+      load();
     }
   }
 
@@ -471,6 +486,43 @@ function SettingsTab({ client, notify, onAppNameChange }) {
         <button className="btn primary" onClick={savePublicUrl}>
           Save address
         </button>
+      </div>
+
+      <h3>Quiet hours</h3>
+      <p style={{ fontSize: 14, color: '#4a5568' }}>
+        Silences the kiosk between these times on <strong>every</strong> device — celebrations
+        still play, they just don't make noise. For the 6am riser who taps three tasks before
+        anyone else is up. The 🔊 button on a kid's screen still works as a per-device
+        override the rest of the day.
+      </p>
+      <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', alignItems: 'center', marginBottom: 24 }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontWeight: 700, fontSize: 14 }}>
+          <input
+            type="checkbox"
+            checked={quiet.on}
+            onChange={(e) => saveQuiet({ ...quiet, on: e.target.checked })}
+            style={{ width: 22, height: 22 }}
+          />
+          Quiet hours {quiet.on ? 'ON' : 'OFF'}
+        </label>
+        <label style={{ fontWeight: 700, fontSize: 14 }}>
+          From{' '}
+          <input
+            type="time"
+            value={quiet.start}
+            onChange={(e) => saveQuiet({ ...quiet, start: e.target.value })}
+            style={{ fontSize: 16, padding: 10, border: '1px solid #cbd5e0', borderRadius: 10 }}
+          />
+        </label>
+        <label style={{ fontWeight: 700, fontSize: 14 }}>
+          until{' '}
+          <input
+            type="time"
+            value={quiet.end}
+            onChange={(e) => saveQuiet({ ...quiet, end: e.target.value })}
+            style={{ fontSize: 16, padding: 10, border: '1px solid #cbd5e0', borderRadius: 10 }}
+          />
+        </label>
       </div>
 
       <h3>School break days</h3>
