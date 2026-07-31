@@ -27,6 +27,38 @@ export function setMuted(muted) {
   localStorage.setItem(MUTE_KEY, muted ? '1' : '0');
 }
 
+/**
+ * Quiet hours — a household-wide window in which the kiosk stays silent.
+ * Set by a parent on the server and pushed here with the rest of the kid's
+ * data; the mute toggle above stays a per-device override on top of it.
+ *
+ * Held in a module variable rather than read from props at the call site
+ * because sounds fire from a dozen places, and the window has to be judged
+ * when the sound plays rather than when the page loaded — a tablet left open
+ * all evening would otherwise still be noisy at bedtime.
+ */
+let quietHours = null;
+
+export function setQuietHours(window) {
+  quietHours = window && window.on ? window : null;
+}
+
+/** "HH:MM" → minutes since midnight. */
+function toMinutes(hhmm) {
+  const [h, m] = String(hhmm).split(':').map(Number);
+  return h * 60 + m;
+}
+
+export function isQuietNow(now = new Date()) {
+  if (!quietHours) return false;
+  const start = toMinutes(quietHours.start);
+  const end = toMinutes(quietHours.end);
+  const mins = now.getHours() * 60 + now.getMinutes();
+  // The useful window wraps midnight (19:30 → 07:00), so a plain
+  // start <= now < end test would be wrong for every realistic setting.
+  return start < end ? mins >= start && mins < end : mins >= start || mins < end;
+}
+
 /** One enveloped oscillator note. Times are relative to "now". */
 function tone(c, { freq, endFreq, start = 0, dur = 0.2, type = 'triangle', gain = 0.18 }) {
   const t0 = c.currentTime + start;
@@ -155,7 +187,7 @@ const SOUNDS = {
 };
 
 export function playSound(name) {
-  if (isMuted()) return;
+  if (isMuted() || isQuietNow()) return;
   try {
     const c = getCtx();
     if (!c) return;

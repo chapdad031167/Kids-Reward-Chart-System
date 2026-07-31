@@ -20,7 +20,14 @@ import { vacationState } from '../vacation.js';
 import { isScheduledOn } from '../schedule.js';
 import { checkBadges, badgeState, markBadgesSeen, levelFor } from '../badges.js';
 import { getFamilyGoal } from '../familyGoal.js';
-import { isConfigured, markConfigured, getAppName, setAppName, setPin } from '../config.js';
+import {
+  isConfigured,
+  markConfigured,
+  getAppName,
+  setAppName,
+  setPin,
+  getQuietHours,
+} from '../config.js';
 import { seedStarterContent } from '../seed.js';
 import { isValidTheme } from '../themes.js';
 
@@ -206,6 +213,10 @@ kiosk.get('/kids/:id/today', (req, res) => {
     level: levelFor(kid.id),
     familyGoal: getFamilyGoal(),
     vacation: vacationState().on,
+    // Sent to the kiosk rather than evaluated here: the window has to be
+    // checked at the moment a sound would play, not at the moment the page
+    // loaded. A tablet left open all evening would otherwise stay noisy.
+    quietHours: getQuietHours(),
     progress: {
       doneCount,
       totalTasks: tasks.length,

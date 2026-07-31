@@ -79,7 +79,13 @@ const id = () => nextId++;
 function seed() {
   nextId = 1;
   const state = {
-    settings: { appName: 'The Demo Family Chart', vacation: false, vacationSince: null, familyGoal: null },
+    settings: {
+      appName: 'The Demo Family Chart',
+      vacation: false,
+      vacationSince: null,
+      familyGoal: null,
+      quietHours: { on: false, start: '19:30', end: '07:00' },
+    },
     categories: SEED_CATEGORIES.map((c, i) => ({ id: i + 1, label: c.label, icon: c.icon, position: i + 1 })),
     kids: [],
     tasks: [],
@@ -542,6 +548,15 @@ function familyGoalState() {
   return { ...goal, progress: Math.min(progress, goal.target), reached: progress >= goal.target };
 }
 
+// ---------------------------------------------------------- quiet hours
+
+const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+/** Mirrors config.js: a saved window, or the suggested default when unset. */
+function quietHours() {
+  return db.settings.quietHours || { on: false, start: '19:30', end: '07:00' };
+}
+
 // ------------------------------------------------------------------ CSV
 
 function csvCell(value) {
@@ -665,6 +680,7 @@ const ROUTES = [
       level: levelFor(kid.id),
       familyGoal: familyGoalState(),
       vacation: db.settings.vacation,
+      quietHours: quietHours(),
       progress: {
         doneCount: tasks.filter((t) => t.status === 'pending' || t.status === 'approved').length,
         totalTasks: tasks.length,
@@ -790,11 +806,23 @@ const ROUTES = [
   ['POST', '/api/parent/verify', () => json({ ok: true })],
 
   ['GET', '/api/parent/settings', () =>
-    json({ appName: db.settings.appName, usingDefaultPin: false, publicUrl: '' })],
+    json({
+      appName: db.settings.appName,
+      usingDefaultPin: false,
+      publicUrl: '',
+      quietHours: quietHours(),
+    })],
 
   ['POST', '/api/parent/settings', (p, body) => {
     if (typeof body.appName === 'string' && body.appName.trim()) db.settings.appName = body.appName.trim();
-    return json({ appName: db.settings.appName, publicUrl: '' });
+    if (body.quietHours !== undefined) {
+      const q = body.quietHours || {};
+      if (!TIME_RE.test(String(q.start)) || !TIME_RE.test(String(q.end)) || q.start === q.end) {
+        return json({ error: 'invalid_quiet_hours' }, 400);
+      }
+      db.settings.quietHours = { on: !!q.on, start: q.start, end: q.end };
+    }
+    return json({ appName: db.settings.appName, publicUrl: '', quietHours: quietHours() });
   }],
 
   ['POST', '/api/parent/pin', () =>

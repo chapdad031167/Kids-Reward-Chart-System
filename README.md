@@ -42,6 +42,8 @@ points land → celebrate.*
   a reward shop you browse and request from, and a savings goal you pick and watch fill.
 - **Streak freezes** — a token a parent grants that spends itself automatically to cover
   one missed day, so a sick Tuesday doesn't erase a 30-day run.
+- A **level bar** showing how close the next rank is ("20 more to Star Voyager"), so every
+  approved task visibly moves something.
 - **Mystery challenges** appear on random days — a glowing chest/egg/capsule that opens
   to reveal a bigger bonus task.
 - **Badges, levels, and a cooperative family goal** for long-term motivation — kids only
@@ -62,6 +64,8 @@ points land → celebrate.*
 - Optional **points → money**: set a per-kid rate and balances show a dollar value
   alongside the points. Off by default; the chart is about habits unless you say otherwise.
 - **CSV export** of the full points ledger and task history — it's your family's data.
+- **Quiet hours** silence the kiosk on every device between the times you pick —
+  celebrations still play, they just don't wake the house at 6am.
 - **Automated nightly backups** (downloadable from the dashboard) and an optional
   **weekly digest + push notifications** via [ntfy](https://ntfy.sh).
 

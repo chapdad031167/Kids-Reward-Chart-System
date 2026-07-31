@@ -4,10 +4,57 @@ import { api, tapTask, queuedTapCount, startQueueSync } from '../api.js';
 import { THEMES } from '../themes.js';
 import { pointsToMoney } from '../money.js';
 import { useIdleTimer } from '../hooks.js';
-import { playSound, isMuted, setMuted } from '../sounds.js';
+import { playSound, isMuted, setMuted, setQuietHours } from '../sounds.js';
 import Celebration from '../components/Celebration.jsx';
 import ProgressMeter from '../components/ProgressMeter.jsx';
 import { Modal, Toast } from '../components/ui.jsx';
+
+/**
+ * Level, title, and — the part that was missing — how close the next one is.
+ *
+ * The server has always sent `floor` and `next` alongside the level number
+ * and the kid screen threw them away, so a kid could see "Lv 4" for a week
+ * with no sense of movement. "6 more to Voyager" is the whole point: it turns
+ * every approved task into visible progress toward something named.
+ *
+ * At the top level there's nothing left to count toward, so it says so
+ * rather than showing a bar that can never fill.
+ */
+function LevelBar({ level, theme }) {
+  const titles = theme.terms.levelTitles;
+  const title = titles[Math.min(level.n - 1, titles.length - 1)];
+  const maxed = level.n >= titles.length;
+  const span = Math.max(1, level.next - level.floor);
+  const into = Math.min(Math.max(level.lifetime - level.floor, 0), span);
+  const remaining = Math.max(level.next - level.lifetime, 0);
+  const nextTitle = titles[Math.min(level.n, titles.length - 1)];
+
+  return (
+    <span className="level-block">
+      <span className="level-chip">
+        Lv {level.n} · {title}
+      </span>
+      {!maxed && (
+        <>
+          <span
+            className="level-bar"
+            role="progressbar"
+            aria-valuemin={0}
+            aria-valuemax={span}
+            aria-valuenow={into}
+            aria-label={`${remaining} more points to level ${level.n + 1}, ${nextTitle}`}
+          >
+            <span className="level-bar-fill" style={{ width: `${(into / span) * 100}%` }} />
+          </span>
+          <span className="level-next">
+            {remaining} more to {nextTitle}
+          </span>
+        </>
+      )}
+      {maxed && <span className="level-next">Top level — nice work! 🏆</span>}
+    </span>
+  );
+}
 
 export default function KidHome() {
   const { kidId } = useParams();
@@ -33,6 +80,9 @@ export default function KidHome() {
     try {
       const d = await api.get(`/api/kids/${kidId}/today`);
       setData(d);
+      // Refreshed on every poll, so a parent changing the window takes
+      // effect on an already-open kiosk without anyone reloading it.
+      setQuietHours(d.quietHours);
     } catch {
       /* offline — keep showing what we have */
     }
@@ -178,12 +228,7 @@ export default function KidHome() {
           </span>
           <span className="kid-title">
             <h1>Hi, {data.kid.name}!</h1>
-            {data.level && (
-              <span className="level-chip">
-                Lv {data.level.n} ·{' '}
-                {theme.terms.levelTitles[Math.min(data.level.n - 1, theme.terms.levelTitles.length - 1)]}
-              </span>
-            )}
+            {data.level && <LevelBar level={data.level} theme={theme} />}
           </span>
           <button className="home-btn" onClick={() => setShowRewards(true)}>
             🎁 {theme.terms.rewards}

@@ -32,6 +32,8 @@ import {
   isDefaultPin,
   getPublicUrl,
   setPublicUrl,
+  getQuietHours,
+  setQuietHours,
 } from '../config.js';
 import { clientKey, lockoutRemaining, recordFailure, recordSuccess } from '../pinGuard.js';
 import { isValidTheme } from '../themes.js';
@@ -83,6 +85,7 @@ parent.get('/settings', (req, res) => {
     appName: getAppName(),
     usingDefaultPin: isDefaultPin(),
     publicUrl: getPublicUrl(),
+    quietHours: getQuietHours(),
   });
 });
 
@@ -98,7 +101,17 @@ parent.post('/settings', (req, res) => {
     }
     setPublicUrl(url);
   }
-  res.json({ ok: true, appName: getAppName(), publicUrl: getPublicUrl() });
+  if (req.body?.quietHours !== undefined) {
+    if (!setQuietHours(req.body.quietHours || {})) {
+      return res.status(400).json({ error: 'invalid_quiet_hours' });
+    }
+  }
+  res.json({
+    ok: true,
+    appName: getAppName(),
+    publicUrl: getPublicUrl(),
+    quietHours: getQuietHours(),
+  });
 });
 
 parent.post('/pin', (req, res) => {
