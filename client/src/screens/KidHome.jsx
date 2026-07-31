@@ -167,183 +167,187 @@ export default function KidHome() {
 
   return (
     <div className="kid-home" style={cssVars}>
-      <header className="kid-header">
-        <span className="mascot" onClick={onMascotTap}>
-          {theme.icons.mascot}
-        </span>
-        <span className="kid-title">
-          <h1>Hi, {data.kid.name}!</h1>
-          {data.level && (
-            <span className="level-chip">
-              Lv {data.level.n} ·{' '}
-              {theme.terms.levelTitles[Math.min(data.level.n - 1, theme.terms.levelTitles.length - 1)]}
-            </span>
-          )}
-        </span>
-        <button className="home-btn" onClick={() => setShowRewards(true)}>
-          🎁 {theme.terms.rewards}
-        </button>
-        <button
-          className="home-btn"
-          aria-label={muted ? 'Turn sounds on' : 'Turn sounds off'}
-          onClick={() => {
-            const next = !muted;
-            setMuted(next);
-            setMutedState(next);
-            if (!next) playSound('ding');
-          }}
-        >
-          {muted ? '🔇' : '🔊'}
-        </button>
-        <button className="home-btn" onClick={() => navigate('/')}>
-          ⬅ Back
-        </button>
-      </header>
-
-      {queuedCount > 0 && (
-        <div className="offline-banner">
-          📡 {queuedCount} tap{queuedCount > 1 ? 's' : ''} saved — will send when back online
-        </div>
-      )}
-
-      {data.vacation && (
-        <div className="panel vacation-panel">
-          <div className="vacation-icon">{theme.icons.mascot}💤</div>
-          <h2>{theme.terms.vacationTitle}</h2>
-          <p>{theme.terms.vacationBody}</p>
-        </div>
-      )}
-
-      {!data.vacation && <ProgressMeter theme={theme} progress={data.progress} />}
-
-      {!data.vacation && data.bonus && !data.bonus.revealed && (
-        <button
-          className={`mystery-card${revealing ? ' revealing' : ''}`}
-          onClick={onRevealMystery}
-        >
-          <span className="mystery-icon">{theme.icons.mystery}</span>
-          <span className="mystery-text">
-            <span className="mystery-title">{theme.terms.mysteryTitle}</span>
-            <span className="mystery-sub">{theme.terms.mysteryTap}</span>
+      {/* Capped and centred so a desktop browser gets a tablet-shaped
+          column instead of task cards stretched across 1900px. */}
+      <div className="kid-content">
+        <header className="kid-header">
+          <span className="mascot" onClick={onMascotTap}>
+            {theme.icons.mascot}
           </span>
-          <span className="mystery-q">❓</span>
-        </button>
-      )}
-      {!data.vacation && data.bonus?.revealed && (
-        <TaskCard
-          task={{ ...data.bonus.task, status: data.bonus.status, streak: 0 }}
-          theme={theme}
-          onTap={onTapBonus}
-          bonus
-        />
-      )}
+          <span className="kid-title">
+            <h1>Hi, {data.kid.name}!</h1>
+            {data.level && (
+              <span className="level-chip">
+                Lv {data.level.n} ·{' '}
+                {theme.terms.levelTitles[Math.min(data.level.n - 1, theme.terms.levelTitles.length - 1)]}
+              </span>
+            )}
+          </span>
+          <button className="home-btn" onClick={() => setShowRewards(true)}>
+            🎁 {theme.terms.rewards}
+          </button>
+          <button
+            className="home-btn"
+            aria-label={muted ? 'Turn sounds on' : 'Turn sounds off'}
+            onClick={() => {
+              const next = !muted;
+              setMuted(next);
+              setMutedState(next);
+              if (!next) playSound('ding');
+            }}
+          >
+            {muted ? '🔇' : '🔊'}
+          </button>
+          <button className="home-btn" onClick={() => navigate('/')}>
+            ⬅ Back
+          </button>
+        </header>
 
-      <div className="panel">
-        <h2>My Points</h2>
-        <div className="vault-row">
-          <div className="vault-box">
-            <div className="vault-amount">
-              {theme.icons.checking} {data.balances.checking}
-            </div>
-            <div className="vault-label">{theme.terms.checking}</div>
+        {queuedCount > 0 && (
+          <div className="offline-banner">
+            📡 {queuedCount} tap{queuedCount > 1 ? 's' : ''} saved — will send when back online
           </div>
-          <div className="vault-box">
-            <div className="vault-amount">
-              {theme.icons.savings} {data.balances.savings}
-            </div>
-            <div className="vault-label">{theme.terms.savings}</div>
+        )}
+
+        {data.vacation && (
+          <div className="panel vacation-panel">
+            <div className="vacation-icon">{theme.icons.mascot}💤</div>
+            <h2>{theme.terms.vacationTitle}</h2>
+            <p>{theme.terms.vacationBody}</p>
           </div>
-        </div>
-        {data.kid.vault_mode === 'manual' && (
-          <button className="transfer-btn" onClick={() => setShowTransfer(true)}>
-            Move points into my {theme.terms.savings}
+        )}
+
+        {!data.vacation && <ProgressMeter theme={theme} progress={data.progress} />}
+
+        {!data.vacation && data.bonus && !data.bonus.revealed && (
+          <button
+            className={`mystery-card${revealing ? ' revealing' : ''}`}
+            onClick={onRevealMystery}
+          >
+            <span className="mystery-icon">{theme.icons.mystery}</span>
+            <span className="mystery-text">
+              <span className="mystery-title">{theme.terms.mysteryTitle}</span>
+              <span className="mystery-sub">{theme.terms.mysteryTap}</span>
+            </span>
+            <span className="mystery-q">❓</span>
           </button>
         )}
-        {data.badges && (
-          <button className="badges-btn" onClick={() => setShowBadges(true)}>
-            🏅 My {theme.terms.badges} ({data.badges.earned.length}/
-            {data.badges.earned.length + data.badges.locked.length})
-          </button>
+        {!data.vacation && data.bonus?.revealed && (
+          <TaskCard
+            task={{ ...data.bonus.task, status: data.bonus.status, streak: 0 }}
+            theme={theme}
+            onTap={onTapBonus}
+            bonus
+          />
         )}
-        {data.familyGoal && (
-          <div className={`family-goal${data.familyGoal.reached ? ' reached' : ''}`}>
-            <span className="family-goal-icon">{data.familyGoal.icon}</span>
-            <span style={{ flex: 1 }}>
-              <div className="goal-title">
-                👨‍👩‍👦‍👦 {theme.terms.familyGoal}: {data.familyGoal.title}
+
+        <div className="panel">
+          <h2>My Points</h2>
+          <div className="vault-row">
+            <div className="vault-box">
+              <div className="vault-amount">
+                {theme.icons.checking} {data.balances.checking}
               </div>
-              {data.familyGoal.reached ? (
-                <div className="goal-reached-text">WE DID IT, TEAM! 🎉</div>
-              ) : (
-                <>
-                  <div className="meter-track goal-track">
-                    <div
-                      className="meter-fill"
-                      style={{ width: `${Math.max(6, Math.round((data.familyGoal.progress / data.familyGoal.target) * 100))}%` }}
-                    />
-                  </div>
-                  <div className="goal-caption">
-                    {data.familyGoal.progress} of {data.familyGoal.target} — everyone's points count!
-                  </div>
-                </>
-              )}
-            </span>
+              <div className="vault-label">{theme.terms.checking}</div>
+            </div>
+            <div className="vault-box">
+              <div className="vault-amount">
+                {theme.icons.savings} {data.balances.savings}
+              </div>
+              <div className="vault-label">{theme.terms.savings}</div>
+            </div>
           </div>
-        )}
-        {data.goal && (
-          <div className={`goal-panel${data.goal.reached ? ' reached' : ''}`}>
-            <span className="goal-icon">{data.goal.reward.icon}</span>
-            <span className="goal-body">
-              <div className="goal-title">
-                ⭐ {theme.terms.goalTitle}: {data.goal.reward.title}
-              </div>
-              {data.goal.reached ? (
-                <div className="goal-reached-text">{theme.terms.goalReached}</div>
-              ) : (
-                <>
-                  <div className="meter-track goal-track">
-                    <div
-                      className="meter-fill"
-                      style={{ width: `${Math.max(6, Math.round((data.goal.saved / data.goal.reward.cost) * 100))}%` }}
-                    />
-                  </div>
-                  <div className="goal-caption">
-                    {data.goal.saved} of {data.goal.reward.cost} points saved — {data.goal.needed} to go!
-                  </div>
-                </>
-              )}
-            </span>
-            <button
-              className="goal-clear"
-              aria-label="Remove goal"
-              onClick={async () => {
-                await api.post(`/api/kids/${kidId}/goal`, { reward_id: null }).catch(() => {});
-                refresh();
-              }}
-            >
-              ✕
+          {data.kid.vault_mode === 'manual' && (
+            <button className="transfer-btn" onClick={() => setShowTransfer(true)}>
+              Move points into my {theme.terms.savings}
             </button>
-          </div>
-        )}
-        {data.pendingRedemptions.length > 0 && (
-          <div style={{ marginTop: 10, fontWeight: 700, fontSize: 14 }}>
-            ⏳ Waiting for a grown-up:{' '}
-            {data.pendingRedemptions.map((r) => `${r.icon} ${r.title}`).join(', ')}
-          </div>
-        )}
-      </div>
+          )}
+          {data.badges && (
+            <button className="badges-btn" onClick={() => setShowBadges(true)}>
+              🏅 My {theme.terms.badges} ({data.badges.earned.length}/
+              {data.badges.earned.length + data.badges.locked.length})
+            </button>
+          )}
+          {data.familyGoal && (
+            <div className={`family-goal${data.familyGoal.reached ? ' reached' : ''}`}>
+              <span className="family-goal-icon">{data.familyGoal.icon}</span>
+              <span style={{ flex: 1 }}>
+                <div className="goal-title">
+                  👨‍👩‍👦‍👦 {theme.terms.familyGoal}: {data.familyGoal.title}
+                </div>
+                {data.familyGoal.reached ? (
+                  <div className="goal-reached-text">WE DID IT, TEAM! 🎉</div>
+                ) : (
+                  <>
+                    <div className="meter-track goal-track">
+                      <div
+                        className="meter-fill"
+                        style={{ width: `${Math.max(6, Math.round((data.familyGoal.progress / data.familyGoal.target) * 100))}%` }}
+                      />
+                    </div>
+                    <div className="goal-caption">
+                      {data.familyGoal.progress} of {data.familyGoal.target} — everyone's points count!
+                    </div>
+                  </>
+                )}
+              </span>
+            </div>
+          )}
+          {data.goal && (
+            <div className={`goal-panel${data.goal.reached ? ' reached' : ''}`}>
+              <span className="goal-icon">{data.goal.reward.icon}</span>
+              <span className="goal-body">
+                <div className="goal-title">
+                  ⭐ {theme.terms.goalTitle}: {data.goal.reward.title}
+                </div>
+                {data.goal.reached ? (
+                  <div className="goal-reached-text">{theme.terms.goalReached}</div>
+                ) : (
+                  <>
+                    <div className="meter-track goal-track">
+                      <div
+                        className="meter-fill"
+                        style={{ width: `${Math.max(6, Math.round((data.goal.saved / data.goal.reward.cost) * 100))}%` }}
+                      />
+                    </div>
+                    <div className="goal-caption">
+                      {data.goal.saved} of {data.goal.reward.cost} points saved — {data.goal.needed} to go!
+                    </div>
+                  </>
+                )}
+              </span>
+              <button
+                className="goal-clear"
+                aria-label="Remove goal"
+                onClick={async () => {
+                  await api.post(`/api/kids/${kidId}/goal`, { reward_id: null }).catch(() => {});
+                  refresh();
+                }}
+              >
+                ✕
+              </button>
+            </div>
+          )}
+          {data.pendingRedemptions.length > 0 && (
+            <div style={{ marginTop: 10, fontWeight: 700, fontSize: 14 }}>
+              ⏳ Waiting for a grown-up:{' '}
+              {data.pendingRedemptions.map((r) => `${r.icon} ${r.title}`).join(', ')}
+            </div>
+          )}
+        </div>
 
-      {!data.vacation && grouped.map(({ cat, tasks }) => (
-        <section key={cat.id}>
-          <div className="category-header">
-            <span>{cat.icon}</span>
-            {cat.label}
-          </div>
-          {tasks.map((task) => (
-            <TaskCard key={task.id} task={task} theme={theme} onTap={() => onTapTask(task)} />
-          ))}
-        </section>
-      ))}
+        {!data.vacation && grouped.map(({ cat, tasks }) => (
+          <section key={cat.id}>
+            <div className="category-header">
+              <span>{cat.icon}</span>
+              {cat.label}
+            </div>
+            {tasks.map((task) => (
+              <TaskCard key={task.id} task={task} theme={theme} onTap={() => onTapTask(task)} />
+            ))}
+          </section>
+        ))}
+      </div>
 
       {celebrating && <Celebration theme={theme} onDone={() => setCelebrating(false)} />}
       {badgeReveal && (

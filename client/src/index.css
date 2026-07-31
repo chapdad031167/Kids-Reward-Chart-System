@@ -567,6 +567,21 @@ button {
   padding: 16px 16px 96px;
 }
 
+/**
+ * The themed background stays full-bleed; the content sits in a centred
+ * column. Without this a desktop browser stretches every task card across the
+ * whole window — a "GOAL! +1 earned" banner 1900px wide, two vault cards with
+ * a two-digit number adrift in each.
+ *
+ * 1280px is chosen so a landscape kiosk tablet is completely unaffected: the
+ * cap simply doesn't apply until the window is wider than the tablet it was
+ * designed for.
+ */
+.kid-content {
+  max-width: 1280px;
+  margin: 0 auto;
+}
+
 .kid-header {
   display: flex;
   align-items: center;
@@ -653,21 +668,21 @@ button {
 
 .egg-svg,
 .scene-svg {
-  width: 92px;
-  height: 116px;
+  width: 116px;
+  height: 146px;
   flex-shrink: 0;
 }
 
 /* Landscape scenes (pitch, track) need the width more than the height. */
 .scene-svg.wide {
-  width: 230px;
-  height: 115px;
+  width: 340px;
+  height: 170px;
 }
 
 .meter-note {
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 600;
-  line-height: 1.4;
+  line-height: 1.45;
 }
 
 .scene-finished {
