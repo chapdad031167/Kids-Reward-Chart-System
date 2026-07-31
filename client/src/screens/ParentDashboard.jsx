@@ -152,6 +152,7 @@ function Dashboard({ pin, onLock, onAppNameChange }) {
   const [tab, setTab] = useState('pending');
   const [toast, setToast] = useState(null);
   const [vacation, setVacation] = useState(null); // {on, since}
+  const [pendingCount, setPendingCount] = useState(0);
   const [confirmingVacation, setConfirmingVacation] = useState(false);
   const navigate = useNavigate();
 
@@ -189,6 +190,21 @@ function Dashboard({ pin, onLock, onAppNameChange }) {
 
   useEffect(() => {
     client.get('/api/parent/vacation').then(setVacation).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Count on the tab itself, so a parent sitting on Tasks or Settings still
+  // sees that work is waiting. Polled here rather than in PendingTab, which
+  // only exists while that tab is open.
+  useEffect(() => {
+    const load = () =>
+      client
+        .get('/api/parent/pending')
+        .then((d) => setPendingCount(d.completions.length + d.redemptions.length))
+        .catch(() => {});
+    load();
+    const poll = setInterval(load, 15000);
+    return () => clearInterval(poll);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -260,6 +276,11 @@ function Dashboard({ pin, onLock, onAppNameChange }) {
             onClick={() => setTab(key)}
           >
             {label}
+            {key === 'pending' && pendingCount > 0 && (
+              <span className="tab-badge" aria-label={`${pendingCount} waiting`}>
+                {pendingCount}
+              </span>
+            )}
           </button>
         ))}
       </div>
@@ -1236,26 +1257,32 @@ function KidsTab({ client, notify }) {
                 </label>
               )}
             </div>
-          </span>
-          <span style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <button className="btn secondary" onClick={() => showHistory(kid)}>
-              📜 History
-            </button>
-            <button className="btn secondary" onClick={() => setAdjusting(kid)}>
-              ⚖️ Adjust points
-            </button>
-            <button className="btn secondary" onClick={() => setSettingCode(kid)}>
-              🔒 Secret code{kid.secret_code ? `: ${kid.secret_code}` : ': none'}
-            </button>
-            <button className="btn danger" onClick={() => setResetting(kid)}>
-              🧹 Reset today
-            </button>
-            <button className="btn secondary" onClick={() => setClearingBadges(kid)}>
-              🏅 Clear trophy case
-            </button>
-            <button className="btn danger" onClick={() => setRemovingKid(kid)}>
-              🗑️ Remove kid
-            </button>
+
+            {/* A wrapping row, not a tall right-hand column — the column left
+                a half-screen void beside every kid. Destructive actions are
+                pushed to their own group at the end. */}
+            <div className="kid-actions">
+              <button className="btn secondary" onClick={() => showHistory(kid)}>
+                📜 History
+              </button>
+              <button className="btn secondary" onClick={() => setAdjusting(kid)}>
+                ⚖️ Adjust points
+              </button>
+              <button className="btn secondary" onClick={() => setSettingCode(kid)}>
+                🔒 Secret code{kid.secret_code ? `: ${kid.secret_code}` : ': none'}
+              </button>
+              <button className="btn secondary" onClick={() => setClearingBadges(kid)}>
+                🏅 Clear trophy case
+              </button>
+              <span className="kid-actions-danger">
+                <button className="btn danger" onClick={() => setResetting(kid)}>
+                  🧹 Reset today
+                </button>
+                <button className="btn danger" onClick={() => setRemovingKid(kid)}>
+                  🗑️ Remove kid
+                </button>
+              </span>
+            </div>
           </span>
         </div>
       ))}

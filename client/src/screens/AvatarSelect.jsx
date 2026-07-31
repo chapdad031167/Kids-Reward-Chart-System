@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { api } from '../api.js';
 import { useLongPress } from '../hooks.js';
 import { KidCodeGate } from '../components/KidCode.jsx';
+import { THEMES } from '../themes.js';
 
 export default function AvatarSelect({ appName = 'Reward Chart' }) {
   const [kids, setKids] = useState([]);
@@ -50,7 +51,14 @@ export default function AvatarSelect({ appName = 'Reward Chart' }) {
       <h1>Who's checking in?</h1>
       <div className="avatar-row">
         {kids.map((kid) => (
-          <button key={kid.id} className={`avatar-btn ${kid.theme}`} onClick={() => onTapAvatar(kid)}>
+          <button
+            key={kid.id}
+            className={`avatar-btn ${kid.theme}`}
+            // Same texture the kid's own screen uses, so the tile is a
+            // preview of where tapping takes them.
+            style={{ '--tile-texture': THEMES[kid.theme]?.colors.texture || 'none' }}
+            onClick={() => onTapAvatar(kid)}
+          >
             <span className="avatar-emoji">{kid.avatar_icon}</span>
             {kid.name}
             {kid.has_code && (
@@ -58,6 +66,22 @@ export default function AvatarSelect({ appName = 'Reward Chart' }) {
                 🔒
               </span>
             )}
+            {/* The pull: what's actually waiting behind this tile. */}
+            <span className="avatar-teasers">
+              {kid.level > 1 && <span className="teaser">Lv {kid.level}</span>}
+              {kid.streak > 0 && (
+                <span className="teaser flame">🔥 {kid.streak}</span>
+              )}
+              {kid.allDone ? (
+                <span className="teaser done">All done! 🎉</span>
+              ) : (
+                kid.waiting > 0 && (
+                  <span className="teaser waiting">
+                    {kid.waiting} to do
+                  </span>
+                )
+              )}
+            </span>
           </button>
         ))}
       </div>

@@ -66,10 +66,41 @@ kiosk.post('/setup', (req, res) => {
 });
 
 kiosk.get('/kids', (req, res) => {
+  const today = todayStr();
   const kids = db
     .prepare(`SELECT id, name, avatar_icon, theme, age, secret_code FROM kids ORDER BY id`)
     .all()
-    .map(({ secret_code, ...kid }) => ({ ...kid, has_code: !!secret_code }));
+    .map(({ secret_code, ...kid }) => {
+      // Teaser figures for the avatar screen — it's the app's front door and
+      // was its emptiest screen. Cheap per kid, and it turns "pick a name"
+      // into "you have 3 waiting and a 5-day streak".
+      const tasks = db
+        .prepare(
+          `SELECT t.id, t.days, c.status
+           FROM tasks t
+           LEFT JOIN completions c ON c.task_id = t.id AND c.kid_id = ? AND c.date = ?
+           WHERE t.active = 1 AND t.is_bonus = 0 AND (t.kid_id IS NULL OR t.kid_id = ?)`
+        )
+        .all(kid.id, today, kid.id)
+        .filter((t) => isScheduledOn(t.days, today));
+
+      const byTask = new Map(
+        db.prepare(`SELECT * FROM streaks WHERE kid_id = ?`).all(kid.id).map((s) => [s.task_id, s])
+      );
+      const bestStreak = tasks.reduce(
+        (best, t) => Math.max(best, displayStreak(byTask.get(t.id), t.days)),
+        0
+      );
+
+      return {
+        ...kid,
+        has_code: !!secret_code,
+        waiting: tasks.filter((t) => !t.status).length,
+        allDone: tasks.length > 0 && tasks.every((t) => t.status),
+        streak: bestStreak,
+        level: levelFor(kid.id).n,
+      };
+    });
   res.json(kids);
 });
 

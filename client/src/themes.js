@@ -3,6 +3,79 @@
  * from the theme object instead of hardcoding soccer/dino strings, so new
  * themes are a matter of adding an entry.
  */
+
+/**
+ * Tileable background texture as an inline SVG data URI.
+ *
+ * A flat gradient is what made every theme read as the same screen in a
+ * different colour. A texture layered over it gives each one a place —
+ * a pitch, a starfield, a track — for a few hundred bytes and no requests,
+ * which keeps the offline promise intact.
+ *
+ * encodeURIComponent handles the `#` in colour literals; hand-escaping data
+ * URIs is where these usually break.
+ */
+const texture = (svg) => `url("data:image/svg+xml,${encodeURIComponent(svg.trim())}")`;
+
+/** Mown pitch stripes with a faint chalk line. */
+const PITCH = texture(`
+<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'>
+  <rect width='80' height='160' fill='#ffffff' opacity='0.035'/>
+  <rect y='158' width='160' height='2' fill='#ffffff' opacity='0.05'/>
+</svg>`);
+
+/** Three-toed tracks wandering across the screen. */
+const TRACKS = texture(`
+<svg xmlns='http://www.w3.org/2000/svg' width='150' height='150'>
+  <g fill='#ffffff' opacity='0.06'>
+    <ellipse cx='34' cy='40' rx='9' ry='11'/>
+    <ellipse cx='25' cy='27' rx='3.5' ry='6' transform='rotate(-20 25 27)'/>
+    <ellipse cx='34' cy='24' rx='3.5' ry='6.5'/>
+    <ellipse cx='43' cy='27' rx='3.5' ry='6' transform='rotate(20 43 27)'/>
+    <ellipse cx='104' cy='110' rx='9' ry='11'/>
+    <ellipse cx='95' cy='97' rx='3.5' ry='6' transform='rotate(-20 95 97)'/>
+    <ellipse cx='104' cy='94' rx='3.5' ry='6.5'/>
+    <ellipse cx='113' cy='97' rx='3.5' ry='6' transform='rotate(20 113 97)'/>
+  </g>
+</svg>`);
+
+/** Starfield: a few bright stars, many faint ones. */
+const STARFIELD = texture(`
+<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'>
+  <g fill='#ffffff'>
+    <circle cx='20' cy='30' r='1.6' opacity='0.5'/>
+    <circle cx='70' cy='15' r='1' opacity='0.3'/>
+    <circle cx='130' cy='45' r='1.8' opacity='0.55'/>
+    <circle cx='180' cy='25' r='1' opacity='0.3'/>
+    <circle cx='45' cy='85' r='1.2' opacity='0.35'/>
+    <circle cx='110' cy='100' r='1' opacity='0.28'/>
+    <circle cx='165' cy='115' r='1.7' opacity='0.5'/>
+    <circle cx='25' cy='140' r='1' opacity='0.3'/>
+    <circle cx='85' cy='160' r='1.5' opacity='0.45'/>
+    <circle cx='145' cy='180' r='1' opacity='0.3'/>
+    <circle cx='195' cy='150' r='1.2' opacity='0.35'/>
+  </g>
+</svg>`);
+
+/** Four-point sparkles, the shape kids draw when they mean "magic". */
+const SPARKLES = texture(`
+<svg xmlns='http://www.w3.org/2000/svg' width='170' height='170'>
+  <g fill='#ffffff'>
+    <path d='M40 18 L44 32 L58 36 L44 40 L40 54 L36 40 L22 36 L36 32 Z' opacity='0.09'/>
+    <path d='M128 78 L131 88 L141 91 L131 94 L128 104 L125 94 L115 91 L125 88 Z' opacity='0.07'/>
+    <path d='M68 128 L72 141 L85 145 L72 149 L68 162 L64 149 L51 145 L64 141 Z' opacity='0.08'/>
+  </g>
+</svg>`);
+
+/** A checkered strip, the way it edges a finish line. */
+const CHECKERS = texture(`
+<svg xmlns='http://www.w3.org/2000/svg' width='48' height='48'>
+  <g fill='#ffffff' opacity='0.05'>
+    <rect width='24' height='24'/>
+    <rect x='24' y='24' width='24' height='24'/>
+  </g>
+</svg>`);
+
 export const THEMES = {
   soccer: {
     key: 'soccer',
@@ -15,10 +88,19 @@ export const THEMES = {
       meterFill: 'linear-gradient(90deg, #f5c518, #ffe27a)',
       chip: '#e8f6ec',
       headerText: '#ffffff',
+      texture: PITCH,
     },
     terms: {
       celebration: 'GOAL!',
       celebrationSub: 'What a shot!',
+      // Kids habituate to a single catchphrase fast; the celebration picks
+      // from these at random so it stays worth watching.
+      cheers: [
+        ['GOAL!', 'What a shot!'],
+        ['BACK OF THE NET!', 'Unstoppable!'],
+        ['WHAT A STRIKE!', 'Straight in the top corner!'],
+        ['GOLAZO!', 'The crowd goes wild!'],
+      ],
       streak: 'Win Streak',
       progress: 'Match Progress',
       checking: 'Spending',
@@ -60,10 +142,17 @@ export const THEMES = {
       meterFill: 'linear-gradient(90deg, #f59e0b, #fbc963)',
       chip: '#f0f9e8',
       headerText: '#ffffff',
+      texture: TRACKS,
     },
     terms: {
       celebration: 'ROAR!',
       celebrationSub: 'Dino-mite job!',
+      cheers: [
+        ['ROAR!', 'Dino-mite job!'],
+        ['STOMP STOMP!', 'Prehistoric power!'],
+        ['RAWR!', 'That was Jurassic-sized!'],
+        ['MIGHTY!', 'Even the T-Rex is impressed!'],
+      ],
       streak: 'Fossil Streak',
       progress: 'Hatch the Egg',
       checking: 'Spending',
@@ -105,10 +194,17 @@ export const THEMES = {
       meterFill: 'linear-gradient(90deg, #ffd94a, #ffe98f)',
       chip: '#e6ebff',
       headerText: '#ffffff',
+      texture: STARFIELD,
     },
     terms: {
       celebration: 'BLAST OFF!',
       celebrationSub: 'Out of this world!',
+      cheers: [
+        ['BLAST OFF!', 'Out of this world!'],
+        ['LIFTOFF!', 'Mission Control is proud!'],
+        ['TO THE STARS!', 'Perfect trajectory!'],
+        ['ORBIT ACHIEVED!', 'Textbook flying, Commander!'],
+      ],
       streak: 'Orbit Streak',
       progress: 'Mission Progress',
       checking: 'Spending',
@@ -150,10 +246,17 @@ export const THEMES = {
       meterFill: 'linear-gradient(90deg, #f5b8d9, #fbdaec)',
       chip: '#f5ebfb',
       headerText: '#ffffff',
+      texture: SPARKLES,
     },
     terms: {
       celebration: 'TA-DA!',
       celebrationSub: 'Simply enchanting!',
+      cheers: [
+        ['TA-DA!', 'Simply enchanting!'],
+        ['ABRACADABRA!', 'Pure magic!'],
+        ['SPELLBINDING!', 'The whole kingdom cheers!'],
+        ['ENCHANTED!', 'The spell worked perfectly!'],
+      ],
       streak: 'Magic Streak',
       progress: 'Royal Quest',
       checking: 'Spending',
@@ -195,10 +298,17 @@ export const THEMES = {
       meterFill: 'linear-gradient(90deg, #ffcf3f, #ffe485)',
       chip: '#fdeee6',
       headerText: '#ffffff',
+      texture: CHECKERS,
     },
     terms: {
       celebration: 'VROOM!',
       celebrationSub: 'Checkered flag!',
+      cheers: [
+        ['VROOM!', 'Checkered flag!'],
+        ['FULL THROTTLE!', 'New lap record!'],
+        ['PIT PERFECT!', 'Straight to the podium!'],
+        ['FLAT OUT!', 'Nobody could catch you!'],
+      ],
       streak: 'Race Streak',
       progress: 'Race to the Finish',
       checking: 'Spending',
