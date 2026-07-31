@@ -66,8 +66,10 @@ points land → celebrate.*
 - **CSV export** of the full points ledger and task history — it's your family's data.
 - **Quiet hours** silence the kiosk on every device between the times you pick —
   celebrations still play, they just don't wake the house at 6am.
-- **Automated nightly backups** (downloadable from the dashboard) and an optional
-  **weekly digest + push notifications** via [ntfy](https://ntfy.sh).
+- **Automated nightly backups**, downloadable *and restorable* from the dashboard — a
+  safety copy of the current data is taken first, so a restore is itself undoable. The
+  chart restarts to finish the swap (see "Restoring a backup" below).
+- An optional **weekly digest + push notifications** via [ntfy](https://ntfy.sh).
 
 **Under the hood:**
 - **Installable PWA** — add it to a tablet or phone home screen and it launches
@@ -120,6 +122,33 @@ cd server && npm install && npm start
 # terminal 2 — Vite dev server on :5173, proxying /api to :8090
 cd client && npm install && npm run dev
 ```
+
+### Restoring a backup
+
+Pick a backup in **Kids & Vaults → Backups** and press **Restore**. It:
+
+1. Checks the file is a real, undamaged SQLite database belonging to this app — a
+   corrupt or foreign file is refused before anything is touched.
+2. Saves a timestamped **safety copy** of the current data, which shows up in the same
+   list tagged `safety copy`. Restoring the wrong file is therefore recoverable:
+   restore the safety copy.
+3. Replaces the database and **restarts the server**.
+
+That last step is deliberate. Around twenty `db.transaction(...)` wrappers are built at
+module load and close over the connection that existed then, so reopening the file
+would leave them pointing at a closed handle. A restart is two seconds and removes a
+whole class of subtle failure from the one operation you run *because* your data has
+already gone wrong.
+
+Under Docker (`restart: unless-stopped`) the container comes back on its own and the
+dashboard reloads itself. Running bare with `npm start` there is nothing to restart the
+process — the data is already restored, but you'll need to start the server yourself.
+
+> SQLite runs in WAL mode, so the database is three files. Restoring through the
+> dashboard checkpoints and clears the `-wal`/`-shm` sidecars. If you ever swap files by
+> hand instead, delete those two as well — leaving a stale WAL beside a restored `.db`
+> lets SQLite replay the old journal over it, which looks like a restore that worked and
+> didn't.
 
 ### The live demo
 

@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { DB_PATH } from './db.js';
 import { ensureBonusPool } from './seed.js';
 import { isConfigured, getAppName } from './config.js';
-import { scheduleBackups } from './backup.js';
+import { scheduleBackups, setRestartHandler } from './backup.js';
 import { scheduleDigest } from './digest.js';
 import { kiosk } from './routes/kiosk.js';
 import { parent } from './routes/parent.js';
@@ -80,6 +80,23 @@ if (staticDir && fs.existsSync(staticDir)) {
 app.use((err, req, res, next) => {
   console.error(err);
   res.status(500).json({ error: 'internal_error' });
+});
+
+/**
+ * A restore replaces the database file underneath a process that is holding
+ * connection-bound prepared statements and transaction wrappers, so the only
+ * safe thing to do afterwards is start over. Exiting cleanly is the restart
+ * when something supervises us — Docker's `restart: unless-stopped`, systemd,
+ * a process manager. Run bare (`npm start`) there is nothing to restart us,
+ * which is why the dashboard says so rather than promising it comes back.
+ *
+ * Living here rather than in the route because restart policy is a property
+ * of how this process is deployed, not of an HTTP handler.
+ */
+setRestartHandler(() => {
+  console.log('Restarting after database restore…');
+  // Enough for the response to reach the browser and the socket to close.
+  setTimeout(() => process.exit(0), 250).unref();
 });
 
 app.listen(PORT, () => {

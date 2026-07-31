@@ -1234,6 +1234,8 @@ function KidsTab({ client, notify }) {
   const [addingKid, setAddingKid] = useState(false);
   const [clearingBadges, setClearingBadges] = useState(null); // kid
   const [removingKid, setRemovingKid] = useState(null); // kid
+  const [restoring, setRestoring] = useState(null); // backup awaiting confirmation
+  const [restoreState, setRestoreState] = useState(null); // 'working' | 'waiting'
   const [editingAvatar, setEditingAvatar] = useState(null); // kid
   const [freshStarting, setFreshStarting] = useState(false);
 
@@ -1254,6 +1256,70 @@ function KidsTab({ client, notify }) {
     } catch {
       notify('Could not download that backup');
     }
+  }
+
+  /** Reasons the server can refuse a file, in words a parent can act on. */
+  const RESTORE_ERRORS = {
+    unknown_backup: 'That backup is no longer there — reload and try again.',
+    not_a_database: "That file isn't a database. Pick one of the backups listed above.",
+    corrupt: 'That backup is damaged, so it was not restored. Try an older one.',
+    unreadable: 'That backup could not be read, so nothing was changed.',
+  };
+
+  function restoreError(reason = '') {
+    if (reason.startsWith('not_a_reward_chart')) {
+      return "That's a database, but not this chart's. Nothing was changed.";
+    }
+    if (reason.startsWith('safety_backup_failed')) {
+      return 'Could not take a safety copy first, so the restore was abandoned. Check disk space.';
+    }
+    return RESTORE_ERRORS[reason] || 'The restore failed and nothing was changed.';
+  }
+
+  /**
+   * Restore, then wait for the server to come back.
+   *
+   * The server replaces the database and exits; whatever supervises it
+   * (Docker's `restart: unless-stopped`) starts it again. So the honest UI is
+   * to poll until it answers and then reload, rather than pretending the
+   * swap was instant or leaving a dead page on screen.
+   */
+  async function doRestore(backup) {
+    setRestoreState('working');
+    let result;
+    try {
+      result = await client.post(`/api/parent/backups/${encodeURIComponent(backup.file)}/restore`);
+    } catch (err) {
+      setRestoreState(null);
+      setRestoring(null);
+      notify(restoreError(err.message));
+      return;
+    }
+
+    setRestoreState('waiting');
+    const deadline = Date.now() + 60000;
+    while (Date.now() < deadline) {
+      await new Promise((r) => setTimeout(r, 1500));
+      try {
+        // Unauthenticated on purpose: the PIN may well have come from the
+        // restored database and no longer be the one this session holds.
+        const res = await fetch('/api/health', { cache: 'no-store' });
+        if (res.ok) {
+          window.location.reload();
+          return;
+        }
+      } catch {
+        /* still down — keep waiting */
+      }
+    }
+    setRestoreState(null);
+    setRestoring(null);
+    // The data is already restored at this point — only the process is
+    // missing — so say that, rather than implying the restore failed.
+    notify(
+      `Restored ${result.restored}, but the server has not come back on its own. ` +
+        'Start it again — your data is already in place.'
+    );
   }
 
   async function grantFreeze(kid, delta) {
@@ -1647,21 +1713,36 @@ function KidsTab({ client, notify }) {
               ? 'No backups yet — the first one is written on boot.'
               : 'Download a copy and keep it somewhere else — a snapshot that only lives on this machine is not really a backup.'}
           </div>
-          {/* Getting a copy off the box used to mean shelling in. */}
+          {/* Getting a copy off the box used to mean shelling in, and putting
+              one back meant shelling in and swapping files by hand. */}
           {backups.length > 0 && (
             <ul className="backup-list">
-              {backups.slice(0, 5).map((b) => (
+              {backups.slice(0, 8).map((b) => (
                 <li key={b.file}>
                   <span>
                     {b.file} <span style={{ color: '#718096' }}>({Math.round(b.size / 1024)} KB)</span>
+                    {b.safety && (
+                      <span className="backup-tag" title="Taken automatically before a destructive action">
+                        safety copy
+                      </span>
+                    )}
                   </span>
-                  <button
-                    className="btn secondary"
-                    onClick={() => downloadBackup(b.file)}
-                    aria-label={`Download ${b.file}`}
-                  >
-                    ⬇ Download
-                  </button>
+                  <span style={{ display: 'flex', gap: 8 }}>
+                    <button
+                      className="btn secondary"
+                      onClick={() => downloadBackup(b.file)}
+                      aria-label={`Download ${b.file}`}
+                    >
+                      ⬇ Download
+                    </button>
+                    <button
+                      className="btn danger"
+                      onClick={() => setRestoring(b)}
+                      aria-label={`Restore from ${b.file}`}
+                    >
+                      ⟲ Restore
+                    </button>
+                  </span>
                 </li>
               ))}
             </ul>
@@ -1682,6 +1763,47 @@ function KidsTab({ client, notify }) {
           Back up now
         </button>
       </div>
+
+      {restoring && (
+        <Modal
+          title={restoreState ? 'Restoring…' : `Restore from ${restoring.file}?`}
+          onClose={restoreState ? undefined : () => setRestoring(null)}
+        >
+          {restoreState ? (
+            <p style={{ fontSize: 16, lineHeight: 1.6 }}>
+              {restoreState === 'working'
+                ? 'Replacing the database…'
+                : 'Database replaced. Waiting for the chart to come back up — this page will reload itself.'}
+            </p>
+          ) : (
+            <>
+              <p style={{ fontSize: 15, lineHeight: 1.6 }}>
+                This replaces <strong>everything</strong> — kids, tasks, rewards, points, streaks
+                and history — with the contents of{' '}
+                <strong>{restoring.file}</strong> ({Math.round(restoring.size / 1024)} KB, saved{' '}
+                {new Date(restoring.modified).toLocaleString()}).
+              </p>
+              <p style={{ fontSize: 15, lineHeight: 1.6 }}>
+                A <strong>safety copy of the current data is saved first</strong>, so this is
+                undoable: if you pick the wrong file, restore the <em>safety copy</em> that appears
+                at the top of the list afterwards.
+              </p>
+              <p style={{ fontSize: 15, lineHeight: 1.6 }}>
+                The chart <strong>restarts itself</strong> to finish — kids' screens will blink and
+                come back. If you run it without Docker, you'll need to start the server yourself.
+              </p>
+              <div className="modal-actions">
+                <button className="btn secondary" onClick={() => setRestoring(null)}>
+                  Cancel
+                </button>
+                <button className="btn danger" style={{ flex: 1 }} onClick={() => doRestore(restoring)}>
+                  Yes, restore this backup
+                </button>
+              </div>
+            </>
+          )}
+        </Modal>
+      )}
 
       <div className="pending-item" style={{ alignItems: 'flex-start' }}>
         <span style={{ fontSize: 28 }}>🔄</span>

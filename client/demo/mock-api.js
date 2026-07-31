@@ -1237,6 +1237,11 @@ const ROUTES = [
   ['GET', '/api/parent/backups', () => json([])],
   ['POST', '/api/parent/backups', () =>
     json({ error: 'demo_no_backups', message: 'Backups need a real server and disk.' }, 400)],
+  // Restore is real in the app: it swaps the database file and restarts the
+  // process. Neither of those exists here, and faking a restart would be the
+  // most misleading thing this mock could do.
+  ['POST', '/api/parent/backups/:name/restore', () =>
+    json({ ok: false, reason: 'unknown_backup', message: 'The demo has no backups to restore.' }, 404)],
   ['GET', '/api/parent/digest', () => json({ data: digestData() })],
   ['POST', '/api/parent/digest', () =>
     json({ error: 'demo_no_ntfy', message: 'The demo has nowhere to send a notification.' }, 400)],
