@@ -641,23 +641,49 @@ button {
   font-size: 15px;
 }
 
-/* Egg progress (dino) */
+/* Per-theme progress scenes. Every theme gets one; they share this layout so
+   the panel keeps the same shape whichever kid is looking at it. */
 
-.egg-progress {
+.scene-meter {
   display: flex;
   align-items: center;
   gap: 16px;
+  flex-wrap: wrap;
 }
 
-.egg-svg {
+.egg-svg,
+.scene-svg {
   width: 92px;
   height: 116px;
   flex-shrink: 0;
 }
 
-.egg-hatched {
+/* Landscape scenes (pitch, track) need the width more than the height. */
+.scene-svg.wide {
+  width: 230px;
+  height: 115px;
+}
+
+.meter-note {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.scene-finished {
   font-size: 64px;
   animation: hatch-pop 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.castle-sparkles {
+  animation: hatch-pop 0.7s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@media (max-width: 560px) {
+  .scene-svg.wide {
+    width: 100%;
+    height: auto;
+  }
 }
 
 @keyframes hatch-pop {

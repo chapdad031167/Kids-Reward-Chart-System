@@ -129,7 +129,7 @@ export const THEMES = {
     },
     celebration: 'soccer',
     sound: 'goal',
-    progressStyle: 'bar',
+    progressStyle: 'pitch',
   },
   dino: {
     key: 'dino',
@@ -233,7 +233,7 @@ export const THEMES = {
     },
     celebration: 'space',
     sound: 'blastoff',
-    progressStyle: 'bar',
+    progressStyle: 'rocket',
   },
   fantasy: {
     key: 'fantasy',
@@ -285,7 +285,7 @@ export const THEMES = {
     },
     celebration: 'fantasy',
     sound: 'magic',
-    progressStyle: 'bar',
+    progressStyle: 'castle',
   },
   racing: {
     key: 'racing',
@@ -337,7 +337,7 @@ export const THEMES = {
     },
     celebration: 'racing',
     sound: 'vroom',
-    progressStyle: 'bar',
+    progressStyle: 'track',
   },
 };
 
