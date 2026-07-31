@@ -40,6 +40,8 @@ points land → celebrate.*
   (animation + synthesized sound) and queues it for a parent.
 - A daily progress meter, a two-vault points economy (spend now vs. save up), streaks,
   a reward shop you browse and request from, and a savings goal you pick and watch fill.
+- **Streak freezes** — a token a parent grants that spends itself automatically to cover
+  one missed day, so a sick Tuesday doesn't erase a 30-day run.
 - **Mystery challenges** appear on random days — a glowing chest/egg/capsule that opens
   to reveal a bigger bonus task.
 - **Badges, levels, and a cooperative family goal** for long-term motivation — kids only
@@ -48,21 +50,27 @@ points land → celebrate.*
 
 **For parents (the PIN-protected dashboard):**
 - An approval queue with one-tap approve/reject, Quick Approve All, and Undo.
-- Full management of tasks (with per-day-of-week schedules), categories, rewards, and
-  each child's vault rules — manual saving or automatic split.
+- Full management of tasks (with per-day-of-week schedules and one-tap Every day /
+  Weekdays / Weekends presets), categories, rewards — including an optional **per-day
+  cap** so "30 minutes of screen time" can't be cashed in five times before lunch — and
+  each child's vault rules: manual saving or automatic split.
 - Add/remove kids, switch a kid's theme, set secret codes, adjust balances, reset a day,
   bonus awards, a "to deliver" list so approved rewards don't get forgotten, and a
   fresh-start wipe (with an automatic safety backup).
-- **Vacation mode** pauses the household and freezes streaks; **automated nightly
-  backups**; and an optional **weekly digest + push notifications** via
-  [ntfy](https://ntfy.sh).
+- **Vacation mode** pauses the household and freezes streaks, and **school break days**
+  are the lighter version — tasks still show, but a miss costs no streak.
+- Optional **points → money**: set a per-kid rate and balances show a dollar value
+  alongside the points. Off by default; the chart is about habits unless you say otherwise.
+- **CSV export** of the full points ledger and task history — it's your family's data.
+- **Automated nightly backups** (downloadable from the dashboard) and an optional
+  **weekly digest + push notifications** via [ntfy](https://ntfy.sh).
 
 **Under the hood:**
 - **Installable PWA** — add it to a tablet or phone home screen and it launches
   full-screen with its own icon, named after your chart. A service worker keeps the
   kiosk rendering through network blips (last-known data), and task taps queue in the
   browser and sync when the connection returns.
-- Five fully-realized themes driven by a single config object, so adding a sixth is a
+- Six fully-realized themes driven by a single config object, so adding a seventh is a
   data change, not a rewrite.
 - Everything is a single SQLite file on a mounted volume; schema migrations run
   automatically on boot.

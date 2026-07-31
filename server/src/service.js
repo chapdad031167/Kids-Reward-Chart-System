@@ -38,7 +38,7 @@ export function displayStreak(streakRow, taskDays = null) {
   const today = todayStr();
   if (
     streakRow.last_completed_date === today ||
-    streakRow.last_completed_date >= prevExpectedDay(taskDays, today)
+    streakRow.last_completed_date >= prevExpectedDay(taskDays, today, streakRow.kid_id)
   ) {
     return streakRow.current_streak;
   }
@@ -139,7 +139,7 @@ function approveCompletionInner(completionId) {
     // now that yesterday stays approvable. The chain was already advanced by
     // the newer day, so leave it alone rather than counting the day twice.
     current = prevStreak.current_streak;
-  } else if (last >= prevExpectedDay(task.days, completion.date)) {
+  } else if (last >= prevExpectedDay(task.days, completion.date, kid.id)) {
     // Chain continues across vacation days and unscheduled days.
     current = prevStreak.current_streak + 1;
   } else {
@@ -317,7 +317,7 @@ export function recomputeStreak(taskId, kidId) {
   let longest = 0;
   let prev = null;
   for (const { date } of rows) {
-    chain = prev !== null && prev >= prevExpectedDay(taskDays, date) ? chain + 1 : 1;
+    chain = prev !== null && prev >= prevExpectedDay(taskDays, date, kidId) ? chain + 1 : 1;
     if (chain > longest) longest = chain;
     prev = date;
   }

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api, tapTask, queuedTapCount, startQueueSync } from '../api.js';
 import { THEMES } from '../themes.js';
+import { pointsToMoney } from '../money.js';
 import { useIdleTimer } from '../hooks.js';
 import { playSound, isMuted, setMuted } from '../sounds.js';
 import Celebration from '../components/Celebration.jsx';
@@ -81,6 +82,7 @@ export default function KidHome() {
   if (!data) return <div className="pin-screen">Loading…</div>;
 
   const theme = THEMES[data.kid.theme] || THEMES.soccer;
+  const money = (points) => pointsToMoney(points, data.kid.cents_per_point);
   const cssVars = {
     '--card': theme.colors.card,
     '--card-text': theme.colors.cardText,
@@ -249,14 +251,29 @@ export default function KidHome() {
                 {theme.icons.checking} {data.balances.checking}
               </div>
               <div className="vault-label">{theme.terms.checking}</div>
+              {/* Only when the family has turned points→money on. A kid who
+                  isn't paid for chores shouldn't be shown a price tag. */}
+              {money(data.balances.checking) && (
+                <div className="vault-money">{money(data.balances.checking)}</div>
+              )}
             </div>
             <div className="vault-box">
               <div className="vault-amount">
                 {theme.icons.savings} {data.balances.savings}
               </div>
               <div className="vault-label">{theme.terms.savings}</div>
+              {money(data.balances.savings) && (
+                <div className="vault-money">{money(data.balances.savings)}</div>
+              )}
             </div>
           </div>
+          {data.kid.freeze_tokens > 0 && (
+            <div className="freeze-banner">
+              🧊 <strong>{data.kid.freeze_tokens}</strong> streak{' '}
+              {data.kid.freeze_tokens === 1 ? 'freeze' : 'freezes'} — if you miss a day, one of
+              these saves your {theme.terms.streak} automatically.
+            </div>
+          )}
           {data.kid.vault_mode === 'manual' && (
             <button className="transfer-btn" onClick={() => setShowTransfer(true)}>
               Move points into my {theme.terms.savings}
@@ -478,7 +495,11 @@ function RewardsModal({ kidId, theme, onClose }) {
       load();
     } catch (err) {
       setToast(
-        err.status ? 'Not enough points for that yet!' : 'Can’t reach the shop — try again in a bit.'
+        err.message === 'daily_limit_reached'
+          ? 'You’ve already had that today — try again tomorrow! ⏰'
+          : err.status
+            ? 'Not enough points for that yet!'
+            : 'Can’t reach the shop — try again in a bit.'
       );
       setConfirming(null);
     }
@@ -508,7 +529,11 @@ function RewardsModal({ kidId, theme, onClose }) {
               <span className="reward-cost">
                 {r.cost} pts · {r.bucket_required === 'savings' ? theme.terms.savings : theme.terms.checking}
               </span>
-              {!r.affordable && <span className="reward-locked">⭐ Tap to make it your goal!</span>}
+              {r.capped ? (
+                <span className="reward-locked">⏰ Had it today — back tomorrow!</span>
+              ) : (
+                !r.affordable && <span className="reward-locked">⭐ Tap to make it your goal!</span>
+              )}
             </button>
           ))}
         </div>
@@ -537,7 +562,26 @@ function RewardsModal({ kidId, theme, onClose }) {
           </div>
         </Modal>
       )}
-      {confirming && !confirming.affordable && (
+      {/* A capped reward isn't something to save up for — they can already
+          afford it, they've just had their share for today. */}
+      {confirming?.capped && (
+        <Modal title="Already had it today!" onClose={() => setConfirming(null)}>
+          <p style={{ fontSize: 16 }}>
+            <strong>
+              {confirming.icon} {confirming.title}
+            </strong>{' '}
+            is a once-a-day treat
+            {confirming.limit_per_day > 1 ? ` (${confirming.limit_per_day} a day)` : ''}. It'll be
+            back tomorrow! ⏰
+          </p>
+          <div className="modal-actions">
+            <button className="btn primary" onClick={() => setConfirming(null)}>
+              OK
+            </button>
+          </div>
+        </Modal>
+      )}
+      {confirming && !confirming.affordable && !confirming.capped && (
         <Modal title="Save up for this?" onClose={() => setConfirming(null)}>
           <p style={{ fontSize: 16 }}>
             <strong>

@@ -6,6 +6,7 @@ import { Modal, Toast } from '../components/ui.jsx';
 import EmojiPicker from '../components/EmojiPicker.jsx';
 import { CodePicker, CODE_LENGTH, CODE_EMOJIS } from '../components/KidCode.jsx';
 import { THEME_OPTIONS } from '../themes.js';
+import { centsLabel, pointsToMoney } from '../money.js';
 
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -20,6 +21,15 @@ function scheduleSummary(days) {
 }
 
 /** Day-of-week chips; null = every day, at least one day always selected. */
+// The three patterns that cover nearly every real chore. Seven taps to build
+// "weekdays" by hand is the kind of friction that stops a parent adding the
+// task at all.
+const SCHEDULE_PRESETS = [
+  { label: 'Every day', days: null },
+  { label: 'Weekdays', days: '12345' },
+  { label: 'Weekends', days: '06' },
+];
+
 function DayPicker({ value, onChange }) {
   const selected = value == null ? new Set(['0', '1', '2', '3', '4', '5', '6']) : new Set(value.split(''));
   function toggle(d) {
@@ -30,18 +40,32 @@ function DayPicker({ value, onChange }) {
     onChange(next.size === 7 ? null : [...next].sort().join(''));
   }
   return (
-    <div className="day-chips">
-      {DAY_LABELS.map((label, i) => (
-        <button
-          type="button"
-          key={label}
-          className={`day-chip${selected.has(String(i)) ? ' on' : ''}`}
-          onClick={() => toggle(String(i))}
-        >
-          {label}
-        </button>
-      ))}
-    </div>
+    <>
+      <div className="day-presets">
+        {SCHEDULE_PRESETS.map((p) => (
+          <button
+            type="button"
+            key={p.label}
+            className={`chip-preset${value === p.days ? ' on' : ''}`}
+            onClick={() => onChange(p.days)}
+          >
+            {p.label}
+          </button>
+        ))}
+      </div>
+      <div className="day-chips">
+        {DAY_LABELS.map((label, i) => (
+          <button
+            type="button"
+            key={label}
+            className={`day-chip${selected.has(String(i)) ? ' on' : ''}`}
+            onClick={() => toggle(String(i))}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+    </>
   );
 }
 
@@ -302,6 +326,23 @@ function Dashboard({ pin, onLock, onAppNameChange }) {
 
 // ---------- Settings ----------
 
+/**
+ * Save a fetched blob to disk. The parent endpoints are PIN-gated by header,
+ * which a plain <a href="…" download> can't carry, so every file the dashboard
+ * offers has to come back as a blob and be handed to the browser this way.
+ */
+function saveBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  // Revoking immediately can cancel the save in some browsers.
+  setTimeout(() => URL.revokeObjectURL(url), 30000);
+}
+
 function SettingsTab({ client, notify, onAppNameChange }) {
   const [appName, setAppName] = useState('');
   const [loaded, setLoaded] = useState(false);
@@ -309,6 +350,8 @@ function SettingsTab({ client, notify, onAppNameChange }) {
   const [pin, setPinValue] = useState('');
   const [pin2, setPin2] = useState('');
   const [publicUrl, setPublicUrl] = useState('');
+  const [breakDays, setBreakDays] = useState([]);
+  const [newBreak, setNewBreak] = useState({ date: '', label: '' });
 
   const load = useCallback(() => {
     client
@@ -320,10 +363,31 @@ function SettingsTab({ client, notify, onAppNameChange }) {
         setLoaded(true);
       })
       .catch(() => notify('Failed to load settings'));
+    client.get('/api/parent/break-days').then(setBreakDays).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(load, [load]);
+
+  async function saveBreakDay(on, date, label) {
+    try {
+      const r = await client.post('/api/parent/break-days', { date, label, on });
+      setBreakDays(r.days);
+      setNewBreak({ date: '', label: '' });
+      notify(on ? `${date} marked as a break day` : `${date} is a normal day again`);
+    } catch {
+      notify('Could not update that day');
+    }
+  }
+
+  async function exportCsv(file, label) {
+    try {
+      saveBlob(await client.blob(`/api/parent/export/${file}`), `reward-chart-${file}`);
+      notify(`Exporting ${label}`);
+    } catch {
+      notify('Export failed');
+    }
+  }
 
   async function saveName() {
     try {
@@ -406,6 +470,73 @@ function SettingsTab({ client, notify, onAppNameChange }) {
         />
         <button className="btn primary" onClick={savePublicUrl}>
           Save address
+        </button>
+      </div>
+
+      <h3>School break days</h3>
+      <p style={{ fontSize: 14, color: '#4a5568' }}>
+        A teacher workday or a snow day isn't a vacation — the routine is just looser for
+        one day. Tasks still show up on a break day, but missing them{' '}
+        <strong>doesn't break a streak</strong>. Vacation mode is the bigger hammer: it pauses
+        the whole chart.
+      </p>
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end', marginBottom: 12 }}>
+        <label style={{ fontWeight: 700, fontSize: 14 }}>
+          Date
+          <br />
+          <input
+            type="date"
+            value={newBreak.date}
+            onChange={(e) => setNewBreak({ ...newBreak, date: e.target.value })}
+            style={{ fontSize: 16, padding: 10, border: '1px solid #cbd5e0', borderRadius: 10 }}
+          />
+        </label>
+        <label style={{ fontWeight: 700, fontSize: 14, flex: 1, minWidth: 180 }}>
+          What is it? (optional)
+          <br />
+          <input
+            value={newBreak.label}
+            placeholder="Teacher workday"
+            maxLength={60}
+            onChange={(e) => setNewBreak({ ...newBreak, label: e.target.value })}
+            style={{ width: '100%', fontSize: 16, padding: 10, border: '1px solid #cbd5e0', borderRadius: 10 }}
+          />
+        </label>
+        <button
+          className="btn primary"
+          disabled={!newBreak.date}
+          onClick={() => saveBreakDay(true, newBreak.date, newBreak.label.trim())}
+        >
+          Add break day
+        </button>
+      </div>
+      {breakDays.length > 0 && (
+        <ul className="backup-list" style={{ marginBottom: 24 }}>
+          {breakDays.map((d) => (
+            <li key={d.date}>
+              <span>
+                📅 {d.date}
+                {d.label ? <span style={{ color: '#718096' }}> — {d.label}</span> : null}
+              </span>
+              <button className="btn secondary" onClick={() => saveBreakDay(false, d.date)}>
+                Remove
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <h3>Export your data</h3>
+      <p style={{ fontSize: 14, color: '#4a5568' }}>
+        Every point and every tap, as spreadsheets. It's your family's data — getting at it
+        shouldn't need a database tool.
+      </p>
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 24 }}>
+        <button className="btn secondary" onClick={() => exportCsv('ledger.csv', 'the points ledger')}>
+          ⬇ Points ledger (CSV)
+        </button>
+        <button className="btn secondary" onClick={() => exportCsv('completions.csv', 'task history')}>
+          ⬇ Task history (CSV)
         </button>
       </div>
 
@@ -873,7 +1004,14 @@ function TaskForm({ task, kids, categories, onSave, onClose }) {
 
 // ---------- Rewards management ----------
 
-const EMPTY_REWARD = { title: '', cost: 10, bucket_required: 'checking', icon: '🎁', kid_id: null };
+const EMPTY_REWARD = {
+  title: '',
+  cost: 10,
+  bucket_required: 'checking',
+  icon: '🎁',
+  kid_id: null,
+  limit_per_day: '',
+};
 
 function RewardsTab({ client, notify }) {
   const [rewards, setRewards] = useState(null);
@@ -889,7 +1027,13 @@ function RewardsTab({ client, notify }) {
   useEffect(load, [load]);
 
   async function save(form) {
-    const body = { ...form, cost: Number(form.cost), kid_id: form.kid_id ? Number(form.kid_id) : null };
+    const body = {
+      ...form,
+      cost: Number(form.cost),
+      kid_id: form.kid_id ? Number(form.kid_id) : null,
+      // '' is how the field says "no cap"; the server stores that as NULL.
+      limit_per_day: form.limit_per_day === '' || form.limit_per_day == null ? 0 : Number(form.limit_per_day),
+    };
     try {
       if (form.id) await client.patch(`/api/parent/rewards/${form.id}`, body);
       else await client.post('/api/parent/rewards', body);
@@ -920,6 +1064,7 @@ function RewardsTab({ client, notify }) {
               <th>Reward</th>
               <th>Cost</th>
               <th>Vault</th>
+              <th>Per day</th>
               <th>Who</th>
               <th></th>
               <th></th>
@@ -933,6 +1078,7 @@ function RewardsTab({ client, notify }) {
                 </td>
                 <td>{r.cost}</td>
                 <td>{r.bucket_required}</td>
+                <td>{r.limit_per_day > 0 ? `max ${r.limit_per_day}` : '—'}</td>
                 <td>{r.kid_id ? kids.find((k) => k.id === r.kid_id)?.name || r.kid_id : 'All kids'}</td>
                 <td>
                   <button className="btn secondary" onClick={() => setEditing({ ...r })}>
@@ -957,7 +1103,7 @@ function RewardsTab({ client, notify }) {
 }
 
 function RewardForm({ reward, kids, onSave, onClose }) {
-  const [form, setForm] = useState(reward);
+  const [form, setForm] = useState({ ...reward, limit_per_day: reward.limit_per_day ?? '' });
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
 
   return (
@@ -977,6 +1123,20 @@ function RewardForm({ reward, kids, onSave, onClose }) {
             <option value="checking">Checking (spending)</option>
             <option value="savings">Savings</option>
           </select>
+        </label>
+        <label>
+          Times per day (blank = no limit)
+          <input
+            type="number"
+            min="1"
+            placeholder="No limit"
+            value={form.limit_per_day ?? ''}
+            onChange={set('limit_per_day')}
+          />
+          <span className="field-hint">
+            Caps how often this can be requested in a day. Pending requests count, so
+            five taps in a row can't sneak past one approval.
+          </span>
         </label>
         <label>
           Icon
@@ -1037,20 +1197,21 @@ function KidsTab({ client, notify }) {
   /** Pull a backup down through the PIN-gated endpoint and save it locally. */
   async function downloadBackup(file) {
     try {
-      const blob = await client.blob(`/api/parent/backups/${encodeURIComponent(file)}/download`);
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = file;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      // Revoking immediately can cancel the save in some browsers.
-      setTimeout(() => URL.revokeObjectURL(url), 30000);
+      saveBlob(await client.blob(`/api/parent/backups/${encodeURIComponent(file)}/download`), file);
       notify(`Downloading ${file}`);
     } catch {
       notify('Could not download that backup');
     }
+  }
+
+  async function grantFreeze(kid, delta) {
+    try {
+      const r = await client.post(`/api/parent/kids/${kid.id}/freeze-tokens`, { delta });
+      notify(`${kid.name} now has ${r.tokens} streak freeze${r.tokens === 1 ? '' : 's'}`);
+    } catch {
+      notify('Could not change freeze tokens');
+    }
+    load();
   }
 
   async function updateVault(kid, patch) {
@@ -1253,6 +1414,14 @@ function KidsTab({ client, notify }) {
             <br />
             💰 Checking: <strong>{kid.balances.checking}</strong> · 🏦 Savings:{' '}
             <strong>{kid.balances.savings}</strong>
+            {kid.cents_per_point > 0 && (
+              <span style={{ color: '#4a5568' }}>
+                {' '}
+                ·{' '}
+                {pointsToMoney(kid.balances.checking + kid.balances.savings, kid.cents_per_point)}{' '}
+                total
+              </span>
+            )}
             <div style={{ marginTop: 10, display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
               <label style={{ fontWeight: 700, fontSize: 14 }}>
                 Theme:{' '}
@@ -1306,6 +1475,24 @@ function KidsTab({ client, notify }) {
                   </select>
                 </label>
               )}
+              {/* Points→money. Off by default: some families want the chart to
+                  be about habits, not allowance, and a dollar figure on screen
+                  changes the whole conversation. */}
+              <label style={{ fontWeight: 700, fontSize: 14 }}>
+                Points are worth:{' '}
+                <select
+                  value={String(kid.cents_per_point ?? 0)}
+                  onChange={(e) => updateVault(kid, { cents_per_point: Number(e.target.value) })}
+                  style={{ fontSize: 15, padding: 8 }}
+                >
+                  <option value="0">Nothing (points only)</option>
+                  {[1, 2, 5, 10, 25, 50, 100].map((c) => (
+                    <option key={c} value={String(c)}>
+                      {centsLabel(c)} each
+                    </option>
+                  ))}
+                </select>
+              </label>
             </div>
 
             {/* A wrapping row, not a tall right-hand column — the column left
@@ -1324,6 +1511,28 @@ function KidsTab({ client, notify }) {
               <button className="btn secondary" onClick={() => setClearingBadges(kid)}>
                 🏅 Clear trophy case
               </button>
+              {/* Freezes are given, not bought — a token a kid can buy with
+                  points is just a discount on quitting. */}
+              <span className="freeze-control">
+                <button
+                  className="btn secondary"
+                  disabled={!kid.freeze_tokens}
+                  aria-label={`Take a streak freeze from ${kid.name}`}
+                  onClick={() => grantFreeze(kid, -1)}
+                >
+                  −
+                </button>
+                <span className="freeze-count" title="Streak freezes: each one covers a missed day">
+                  🧊 {kid.freeze_tokens ?? 0}
+                </span>
+                <button
+                  className="btn secondary"
+                  aria-label={`Give ${kid.name} a streak freeze`}
+                  onClick={() => grantFreeze(kid, 1)}
+                >
+                  +
+                </button>
+              </span>
               <span className="kid-actions-danger">
                 <button className="btn danger" onClick={() => setResetting(kid)}>
                   🧹 Reset today

@@ -14,6 +14,7 @@ import {
 } from '../service.js';
 import { notifyParent, reviewActions } from '../notify.js';
 import { readToken } from '../actionToken.js';
+import { applyStreakFreezes, freezeTokens } from '../streakFreeze.js';
 import { getBonusForToday, revealBonus } from '../bonus.js';
 import { vacationState } from '../vacation.js';
 import { isScheduledOn } from '../schedule.js';
@@ -129,6 +130,7 @@ kiosk.get('/kids/:id/today', (req, res) => {
   if (!kid) return res.status(404).json({ error: 'kid_not_found' });
 
   expireStalePending();
+  applyStreakFreezes();
   const today = todayStr();
 
   const tasks = db
@@ -192,6 +194,8 @@ kiosk.get('/kids/:id/today', (req, res) => {
       theme: kid.theme,
       vault_mode: kid.vault_mode,
       has_code: !!kid.secret_code,
+      freeze_tokens: freezeTokens(kid.id),
+      cents_per_point: kid.cents_per_point || 0,
     },
     balances: balances(kid.id),
     tasks,
@@ -271,17 +275,39 @@ kiosk.get('/kids/:id/rewards', (req, res) => {
 
   const rewards = db
     .prepare(
-      `SELECT id, title, cost, bucket_required, icon FROM rewards_catalog
+      `SELECT id, title, cost, bucket_required, icon, limit_per_day FROM rewards_catalog
        WHERE active = 1 AND (kid_id IS NULL OR kid_id = ?) ORDER BY cost, id`
     )
     .all(kid.id)
-    .map((r) => ({
-      ...r,
-      affordable: bal[r.bucket_required] - held[r.bucket_required] >= r.cost,
-    }));
+    .map((r) => {
+      // A capped-out reward is reported separately from an unaffordable one:
+      // "you already had that today" and "you can't afford that" want very
+      // different words, and the goal-setting prompt suits neither.
+      const capped = r.limit_per_day > 0 && redeemedToday(kid.id, r.id) >= r.limit_per_day;
+      return {
+        ...r,
+        capped,
+        affordable: !capped && bal[r.bucket_required] - held[r.bucket_required] >= r.cost,
+      };
+    });
 
   res.json({ balances: bal, rewards });
 });
+
+/**
+ * How many times this kid has asked for this reward today. Counts pending as
+ * well as approved — otherwise a kid could queue five screen-time requests
+ * before a parent ruled on the first, which is the loophole the cap closes.
+ */
+function redeemedToday(kidId, rewardId) {
+  return db
+    .prepare(
+      `SELECT COUNT(*) AS n FROM redemptions
+       WHERE kid_id = ? AND reward_id = ? AND status IN ('pending', 'approved')
+         AND substr(redeemed_at, 1, 10) = ?`
+    )
+    .get(kidId, rewardId, todayStr()).n;
+}
 
 /** Kid requests a redemption — goes to the parent pending queue. */
 kiosk.post('/redemptions', (req, res) => {
@@ -291,6 +317,10 @@ kiosk.post('/redemptions', (req, res) => {
   if (!kid || !reward) return res.status(400).json({ error: 'invalid_kid_or_reward' });
   if (reward.kid_id !== null && reward.kid_id !== kid.id) {
     return res.status(400).json({ error: 'reward_not_available_to_kid' });
+  }
+
+  if (reward.limit_per_day > 0 && redeemedToday(kid.id, reward.id) >= reward.limit_per_day) {
+    return res.status(400).json({ error: 'daily_limit_reached', limit: reward.limit_per_day });
   }
 
   // Against spendable, not raw balance: the rewards list already greys out

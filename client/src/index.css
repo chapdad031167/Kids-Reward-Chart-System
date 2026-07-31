@@ -523,6 +523,31 @@ button {
 
 /* ---------- Day picker ---------- */
 
+/* Presets above the per-day chips: "Weekdays" is one tap instead of seven. */
+.day-presets {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.chip-preset {
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 700;
+  background: #fff;
+  color: #4a5568;
+  border: 2px solid #cbd5e0;
+}
+
+.chip-preset.on {
+  background: #2e9e56;
+  color: #fff;
+  border-color: #2e9e56;
+}
+
 .day-chips {
   display: flex;
   gap: 6px;
@@ -735,6 +760,27 @@ button {
   font-size: 14px;
   font-weight: 600;
   opacity: 0.8;
+}
+
+/* What the points are worth, when the family has turned that on. Sits under
+   the label, quieter than it — the points are still the headline. */
+.vault-box .vault-money {
+  margin-top: 4px;
+  font-size: 15px;
+  font-weight: 800;
+  opacity: 0.75;
+}
+
+/* "You have freezes" — reassurance, not a call to action, so it's flat and
+   informational rather than a tappable card. */
+.freeze-banner {
+  margin-top: 12px;
+  border-radius: 14px;
+  background: var(--chip);
+  padding: 10px 14px;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.4;
 }
 
 .transfer-btn {
@@ -1726,6 +1772,15 @@ button {
   font-family: inherit;
 }
 
+/* Explanatory line under a field whose consequences aren't obvious from its
+   label alone. Deliberately not bold — it's an aside, not part of the label. */
+.field-hint {
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.4;
+  color: #718096;
+}
+
 /* PIN pad */
 
 .pin-screen {
@@ -2102,6 +2157,36 @@ button {
   /* .btn.secondary carries flex:1 for full-width stacks elsewhere; here the
      buttons should size to their labels instead of stretching edge to edge. */
   flex: 0 0 auto;
+}
+
+/* Streak-freeze stepper: −  🧊 2  + as one visual unit, so the count reads as
+   a value being adjusted rather than a third button in the row. */
+.freeze-control {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: #ebf8ff;
+  border: 2px solid #bee3f8;
+  border-radius: 12px;
+  padding: 3px 4px;
+}
+
+.freeze-control .btn {
+  min-width: 40px;
+  padding: 9px 10px;
+  font-size: 18px;
+}
+
+.freeze-control .btn:disabled {
+  opacity: 0.4;
+}
+
+.freeze-count {
+  font-size: 15px;
+  font-weight: 800;
+  color: #2c5282;
+  min-width: 46px;
+  text-align: center;
 }
 
 .kid-actions-danger {

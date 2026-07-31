@@ -25,8 +25,11 @@ export function dayOffset(n) {
 }
 
 export function makeKid(name, extra = {}) {
+  // A real theme key, not a placeholder: PATCH /kids validates the theme it
+  // reads back off the row, so a fixture with a made-up one fails every
+  // unrelated field update with invalid_theme.
   const id = db
-    .prepare(`INSERT INTO kids (name, avatar_icon, theme, age) VALUES (?, '🙂', 'default', 8)`)
+    .prepare(`INSERT INTO kids (name, avatar_icon, theme, age) VALUES (?, '🙂', 'soccer', 8)`)
     .run(name).lastInsertRowid;
   if (extra.checking) credit(id, extra.checking, 'checking');
   if (extra.savings) credit(id, extra.savings, 'savings');

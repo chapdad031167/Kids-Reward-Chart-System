@@ -236,6 +236,41 @@ if (!redemptionColumns.includes('fulfilled_at')) {
   db.exec(`ALTER TABLE redemptions ADD COLUMN fulfilled_at TEXT`);
 }
 
+// Per-reward daily cap: NULL means unlimited, which is the old behaviour and
+// therefore the right default for every existing row.
+const rewardColumns = db.prepare(`PRAGMA table_info(rewards_catalog)`).all().map((c) => c.name);
+if (!rewardColumns.includes('limit_per_day')) {
+  db.exec(`ALTER TABLE rewards_catalog ADD COLUMN limit_per_day INTEGER`);
+}
+
+// Streak freezes: a token a kid spends automatically to survive a missed day,
+// plus the days it has already covered. A frozen day behaves exactly like a
+// vacation day for that one kid, which is why the streak walk can just skip it.
+const kidCols2 = db.prepare(`PRAGMA table_info(kids)`).all().map((c) => c.name);
+if (!kidCols2.includes('freeze_tokens')) {
+  db.exec(`ALTER TABLE kids ADD COLUMN freeze_tokens INTEGER NOT NULL DEFAULT 0`);
+}
+// Points→money: a per-kid conversion rate in cents, 0 = the feature is off.
+if (!kidCols2.includes('cents_per_point')) {
+  db.exec(`ALTER TABLE kids ADD COLUMN cents_per_point INTEGER NOT NULL DEFAULT 0`);
+}
+
+db.exec(`
+CREATE TABLE IF NOT EXISTS streak_freeze_days (
+  kid_id INTEGER NOT NULL REFERENCES kids(id),
+  date TEXT NOT NULL,
+  spent_at TEXT NOT NULL,
+  PRIMARY KEY (kid_id, date)
+);
+
+/* Break days: the school calendar that a weekly weekday pattern can't
+   express. Tasks still appear, but a miss doesn't break a streak. */
+CREATE TABLE IF NOT EXISTS break_days (
+  date TEXT PRIMARY KEY,
+  label TEXT
+);
+`);
+
 /** Current point balances per bucket for a kid. */
 export function balances(kidId) {
   const rows = db
