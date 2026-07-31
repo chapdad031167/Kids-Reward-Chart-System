@@ -36,7 +36,15 @@ import {
   CATEGORY_IDS,
 } from '../../server/src/seedData.js';
 
-const DEMO_KEY = 'reward-chart-demo-db';
+/**
+ * Versioned on purpose. The previous demo stored a differently-shaped object
+ * under 'reward-chart-demo-db', and it was still valid JSON — so reading it
+ * back parsed cleanly and left the state undefined, and every returning
+ * visitor got an empty chart. Bump this suffix whenever the stored shape
+ * changes; old data then can't be read at all rather than being read wrong.
+ */
+const DEMO_KEY = 'reward-chart-demo-db-v2';
+const LEGACY_KEYS = ['reward-chart-demo-db'];
 
 // ---------------------------------------------------------------- dates
 
@@ -187,18 +195,34 @@ function seed() {
   return state;
 }
 
+/**
+ * Everything a restored state has to have before we'll trust it. Valid JSON
+ * is not the same as usable state, and the difference is a white screen.
+ */
+const REQUIRED_KEYS = ['settings', 'categories', 'kids', 'tasks', 'rewards', 'ledger'];
+
+function usable(state) {
+  if (!state || typeof state !== 'object') return false;
+  return REQUIRED_KEYS.every((k) => state[k] !== null && state[k] !== undefined);
+}
+
 function load() {
   const params = new URLSearchParams(location.search);
   if (params.has('reset')) localStorage.removeItem(DEMO_KEY);
+  for (const key of LEGACY_KEYS) localStorage.removeItem(key);
+
   const raw = localStorage.getItem(DEMO_KEY);
   if (raw) {
     try {
       const parsed = JSON.parse(raw);
-      db = parsed.state;
-      nextId = parsed.nextId;
-      return;
+      if (usable(parsed?.state) && Number.isInteger(parsed.nextId)) {
+        db = parsed.state;
+        nextId = parsed.nextId;
+        return;
+      }
+      console.warn('[demo] stored state is not usable — reseeding.');
     } catch {
-      // Corrupt or from an older shape — reseeding beats a broken demo.
+      // Corrupt — reseeding beats a broken demo.
     }
   }
   seed();
@@ -1245,6 +1269,15 @@ window.fetch = async (input, init = {}) => {
   const url = typeof input === 'string' ? input : input.url;
   const pathname = new URL(url, location.href).pathname;
   if (!pathname.startsWith('/api/')) return realFetch(input, init);
+
+  // Backstop. A demo that renders an empty chart is worse than useless — it
+  // reads as "this app does nothing" — so if the state is ever missing or
+  // damaged, reseed rather than serve 500s for the rest of the session.
+  if (!usable(db)) {
+    console.warn('[demo] state was unusable at request time — reseeding.');
+    seed();
+    save();
+  }
 
   const method = (init.method || (typeof input !== 'string' && input.method) || 'GET').toUpperCase();
   const match = matchRoute(method, pathname);
