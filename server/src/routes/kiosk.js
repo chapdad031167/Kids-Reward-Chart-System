@@ -7,8 +7,13 @@ import {
   transferPoints,
   pendingHolds,
   spendableBalance,
+  approveCompletion,
+  rejectCompletion,
+  approveRedemption,
+  rejectRedemption,
 } from '../service.js';
-import { notifyParent } from '../notify.js';
+import { notifyParent, reviewActions } from '../notify.js';
+import { readToken } from '../actionToken.js';
 import { getBonusForToday, revealBonus } from '../bonus.js';
 import { vacationState } from '../vacation.js';
 import { isScheduledOn } from '../schedule.js';
@@ -235,7 +240,8 @@ kiosk.post('/completions', (req, res) => {
     notifyParent(
       'Task waiting for approval',
       `${kidName}: ${task.title} (+${task.point_value})`,
-      'hourglass_flowing_sand'
+      'hourglass_flowing_sand',
+      reviewActions('completion', completion.id)
     );
     res.status(201).json({ completion, duplicate: false });
   } catch (err) {
@@ -293,8 +299,54 @@ kiosk.post('/redemptions', (req, res) => {
        VALUES (?, ?, ?, ?, 'pending')`
     )
     .run(kid_id, reward_id, reward.cost, nowIso());
-  notifyParent('Reward request', `${kid.name} wants: ${reward.title} (${reward.cost} pts)`, 'gift');
+  notifyParent(
+    'Reward request',
+    `${kid.name} wants: ${reward.title} (${reward.cost} pts)`,
+    'gift',
+    reviewActions('redemption', Number(info.lastInsertRowid))
+  );
   res.status(201).json(db.prepare(`SELECT * FROM redemptions WHERE id = ?`).get(info.lastInsertRowid));
+});
+
+/**
+ * One-tap approve/reject from a push notification.
+ *
+ * Deliberately outside the PIN gate: the bearer token *is* the authorisation,
+ * and it only ever authorises the single action it names. Replays are
+ * harmless — approving an already-approved item is a no-op — so a token that
+ * has been used simply reports that there was nothing left to do.
+ */
+kiosk.post('/action/:token', (req, res) => {
+  const claim = readToken(req.params.token);
+  if (!claim) return res.status(403).json({ error: 'invalid_or_expired' });
+
+  const { kind, id, act } = claim;
+  let ok = false;
+  let note = '';
+
+  if (kind === 'completion') {
+    // Both return a plain boolean: false means it was no longer pending.
+    ok = act === 'approve' ? approveCompletion(id) : rejectCompletion(id);
+    if (ok && act === 'approve') {
+      const row = db.prepare(`SELECT kid_id FROM completions WHERE id = ?`).get(id);
+      if (row) checkBadges(row.kid_id);
+    }
+  } else if (act === 'approve') {
+    // approveRedemption returns {ok, reason} — it can fail on affordability.
+    const result = approveRedemption(id);
+    ok = result.ok === true;
+    if (!ok && result.reason === 'insufficient_points') {
+      note = 'They can no longer afford this one.';
+    }
+  } else {
+    ok = rejectRedemption(id) === true;
+  }
+
+  // A phone opening this shows the body, so answer in words rather than JSON.
+  res
+    .status(200)
+    .type('text/plain')
+    .send(ok ? `Done — ${act}d.` : note || 'Already handled — nothing to do.');
 });
 
 /** Kid dismissed the "new badge" celebration. */

@@ -1924,6 +1924,124 @@ button {
   color: #713f12;
 }
 
+/* Weekly digest: per-kid bars plus the most-skipped list. */
+.digest-kid {
+  margin-bottom: 18px;
+}
+
+.digest-kid-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  font-size: 14px;
+  margin-bottom: 6px;
+}
+
+.digest-kid-head span {
+  color: #4a5568;
+}
+
+.digest-bars {
+  display: flex;
+  gap: 6px;
+  align-items: flex-end;
+  height: 96px;
+  padding: 6px 8px;
+  background: #f7fafc;
+  border-radius: 10px;
+}
+
+.digest-bar {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  height: 100%;
+  gap: 3px;
+}
+
+.digest-bar-fill {
+  width: 100%;
+  max-width: 34px;
+  min-height: 3px;
+  border-radius: 5px 5px 0 0;
+  background: linear-gradient(180deg, #4299e1, #2b6cb0);
+  transition: height 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.digest-bar-value {
+  font-size: 11px;
+  font-weight: 700;
+  color: #2d3748;
+  line-height: 1;
+}
+
+.digest-bar-day {
+  font-size: 11px;
+  color: #718096;
+  line-height: 1;
+}
+
+.digest-missed {
+  list-style: none;
+  margin: 0 0 14px;
+  padding: 0;
+  font-size: 14px;
+}
+
+.digest-missed li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0;
+  border-bottom: 1px solid #edf2f7;
+}
+
+.digest-missed-count {
+  font-weight: 700;
+  color: #9b2c2c;
+}
+
+.digest-pending {
+  font-size: 14px;
+  font-weight: 600;
+  background: #fef3c7;
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+/* Downloadable backup list in the parent dashboard. */
+.backup-list {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 14px;
+}
+
+.backup-list li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.backup-list li > span {
+  flex: 1;
+  min-width: 200px;
+}
+
+.backup-list .btn {
+  flex: 0 0 auto;
+  min-height: 40px;
+  padding: 8px 14px;
+  font-size: 14px;
+}
+
 /* Kid card actions: a wrapping row with the destructive pair set apart by a
    rule, so "Remove kid" never sits flush against "History". */
 .kid-actions {

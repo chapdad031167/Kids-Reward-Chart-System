@@ -21,14 +21,28 @@ function lastDays(n) {
   return days;
 }
 
-export function buildDigest() {
+/**
+ * The digest as data rather than prose.
+ *
+ * `buildDigest()` formats this for ntfy, and the dashboard renders it as a
+ * proper week view. The insight here — which chores keep getting skipped —
+ * is the most parent-useful thing the app knows, and it was previously only
+ * available as a text blob in a <pre>.
+ */
+export function digestData() {
   const days = lastDays(7);
   const since = days[days.length - 1];
   const sinceIso = `${since}T00:00:00`;
   const kids = db.prepare(`SELECT * FROM kids ORDER BY id`).all();
-  const lines = [];
 
-  for (const kid of kids) {
+  const perDay = db.prepare(
+    `SELECT COALESCE(SUM(amount), 0) AS n FROM points_ledger
+     WHERE kid_id = ? AND direction = 'earn'
+       AND source != 'transfer' AND source != 'adjustment'
+       AND created_at >= ? AND created_at < ?`
+  );
+
+  const kidRows = kids.map((kid) => {
     const earned = db
       .prepare(
         `SELECT COALESCE(SUM(amount), 0) AS n FROM points_ledger
@@ -47,15 +61,37 @@ export function buildDigest() {
       .all(kid.id)
       .filter((s) => displayStreak(s, s.task_days) >= 3).length;
 
-    lines.push(
-      `${kid.avatar_icon} ${kid.name}: +${earned} pts · ${approved} tasks · ` +
-        `${liveStreaks} streak${liveStreaks === 1 ? '' : 's'} going (3+ days)` +
-        (newBadges ? ` · ${newBadges} new badge${newBadges === 1 ? '' : 's'} 🏅` : '')
-    );
-  }
+    // Oldest-first, so the chart reads left to right like a week does.
+    const daily = [...days].reverse().map((day) => ({
+      date: day,
+      points: perDay.get(kid.id, `${day}T00:00:00`, `${day}T23:59:59.999`).n,
+    }));
 
-  // Most-skipped tasks: scheduled days (excluding today and vacation) with
-  // no completion — the "is this chore mispriced?" signal.
+    return {
+      id: kid.id,
+      name: kid.name,
+      icon: kid.avatar_icon,
+      earned,
+      approved,
+      newBadges,
+      liveStreaks,
+      daily,
+    };
+  });
+
+  const missed = mostSkipped(days, kids);
+  const pendingNow = db
+    .prepare(`SELECT COUNT(*) AS n FROM completions WHERE status = 'pending' AND date = ?`)
+    .get(todayStr()).n;
+
+  return { since, days: [...days].reverse(), kids: kidRows, missed, pendingNow };
+}
+
+/**
+ * Scheduled days (excluding today and vacation) with no completion — the
+ * "is this chore mispriced or unrealistic?" signal.
+ */
+function mostSkipped(days, kids) {
   const tasks = db.prepare(`SELECT * FROM tasks WHERE active = 1 AND is_bonus = 0`).all();
   const completionLookup = db.prepare(
     `SELECT status FROM completions WHERE task_id = ? AND kid_id = ? AND date = ?`
@@ -75,15 +111,30 @@ export function buildDigest() {
     if (misses > 0) missed.push({ title: task.title, misses });
   }
   missed.sort((a, b) => b.misses - a.misses);
+  return missed;
+}
+
+/** The same figures, formatted for a push notification. */
+export function buildDigest() {
+  const { kids, missed, pendingNow } = digestData();
+  const lines = [];
+
+  for (const kid of kids) {
+    lines.push(
+      `${kid.icon} ${kid.name}: +${kid.earned} pts · ${kid.approved} tasks · ` +
+        `${kid.liveStreaks} streak${kid.liveStreaks === 1 ? '' : 's'} going (3+ days)` +
+        (kid.newBadges ? ` · ${kid.newBadges} new badge${kid.newBadges === 1 ? '' : 's'} 🏅` : '')
+    );
+  }
+
   if (missed.length > 0) {
     lines.push('', 'Most skipped this week:');
     for (const m of missed.slice(0, 3)) lines.push(`• ${m.title} (${m.misses}x)`);
   }
 
-  const pendingNow = db
-    .prepare(`SELECT COUNT(*) AS n FROM completions WHERE status = 'pending' AND date = ?`)
-    .get(todayStr()).n;
-  if (pendingNow > 0) lines.push('', `⏳ ${pendingNow} completion${pendingNow === 1 ? '' : 's'} waiting for approval right now.`);
+  if (pendingNow > 0) {
+    lines.push('', `⏳ ${pendingNow} completion${pendingNow === 1 ? '' : 's'} waiting for approval right now.`);
+  }
 
   return lines.join('\n');
 }

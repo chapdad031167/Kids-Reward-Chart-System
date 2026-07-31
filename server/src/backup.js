@@ -45,6 +45,18 @@ export function listBackups() {
     });
 }
 
+/**
+ * Absolute path of a backup the parent may download, or null.
+ *
+ * Resolved by exact match against what `listBackups()` already exposes rather
+ * than by sanitising the input — an allowlist can't be walked out of, so
+ * `../../etc/passwd` and friends simply aren't in the set.
+ */
+export function backupFilePath(name) {
+  const known = listBackups().some((b) => b.file === name);
+  return known ? path.join(BACKUP_DIR, name) : null;
+}
+
 export function scheduleBackups() {
   const safeRun = () => runBackup().catch((err) => console.warn(`Backup failed: ${err.message}`));
   safeRun(); // one on every boot

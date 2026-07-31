@@ -174,6 +174,7 @@ function Dashboard({ pin, onLock, onAppNameChange }) {
       post: (url, body) => guard(raw.post(url, body)),
       patch: (url, body) => guard(raw.patch(url, body)),
       delete: (url) => guard(raw.delete(url)),
+      blob: (url) => guard(raw.blob(url)),
     };
   }, [pin, onLock]);
 
@@ -306,6 +307,7 @@ function SettingsTab({ client, notify, onAppNameChange }) {
   const [usingDefaultPin, setUsingDefaultPin] = useState(false);
   const [pin, setPinValue] = useState('');
   const [pin2, setPin2] = useState('');
+  const [publicUrl, setPublicUrl] = useState('');
 
   const load = useCallback(() => {
     client
@@ -313,6 +315,7 @@ function SettingsTab({ client, notify, onAppNameChange }) {
       .then((s) => {
         setAppName(s.appName);
         setUsingDefaultPin(!!s.usingDefaultPin);
+        setPublicUrl(s.publicUrl || '');
         setLoaded(true);
       })
       .catch(() => notify('Failed to load settings'));
@@ -328,6 +331,16 @@ function SettingsTab({ client, notify, onAppNameChange }) {
       onAppNameChange?.();
     } catch {
       notify('Could not save the name');
+    }
+  }
+
+  async function savePublicUrl() {
+    try {
+      const r = await client.post('/api/parent/settings', { publicUrl: publicUrl.trim() });
+      setPublicUrl(r.publicUrl || '');
+      notify(r.publicUrl ? 'Approve buttons enabled in notifications' : 'Approve buttons turned off');
+    } catch {
+      notify('That does not look like a URL — include http:// or https://');
     }
   }
 
@@ -373,6 +386,25 @@ function SettingsTab({ client, notify, onAppNameChange }) {
         />
         <button className="btn primary" disabled={!appName.trim()} onClick={saveName}>
           Save name
+        </button>
+      </div>
+
+      <h3>Approve from your phone</h3>
+      <p style={{ fontSize: 14, color: '#4a5568' }}>
+        The address your phone can reach this chart on — usually the Tailscale one. Setting it
+        puts <strong>Approve</strong> and <strong>Not yet</strong> buttons directly in the ntfy
+        notification, so you can approve from anywhere without opening the dashboard. Leave it
+        blank to turn the buttons off. See "Remote access" in the README for the 10-minute setup.
+      </p>
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 24 }}>
+        <input
+          value={publicUrl}
+          placeholder="http://chart-server:8090"
+          onChange={(e) => setPublicUrl(e.target.value)}
+          style={{ flex: 1, minWidth: 220, fontSize: 16, padding: 12, border: '1px solid #cbd5e0', borderRadius: 10 }}
+        />
+        <button className="btn primary" onClick={savePublicUrl}>
+          Save address
         </button>
       </div>
 
@@ -1001,6 +1033,25 @@ function KidsTab({ client, notify }) {
 
   useEffect(load, [load]);
 
+  /** Pull a backup down through the PIN-gated endpoint and save it locally. */
+  async function downloadBackup(file) {
+    try {
+      const blob = await client.blob(`/api/parent/backups/${encodeURIComponent(file)}/download`);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = file;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      // Revoking immediately can cancel the save in some browsers.
+      setTimeout(() => URL.revokeObjectURL(url), 30000);
+      notify(`Downloading ${file}`);
+    } catch {
+      notify('Could not download that backup');
+    }
+  }
+
   async function updateVault(kid, patch) {
     try {
       await client.patch(`/api/parent/kids/${kid.id}`, patch);
@@ -1058,7 +1109,7 @@ function KidsTab({ client, notify }) {
           className="btn secondary"
           onClick={async () => {
             const d = await client.get('/api/parent/digest').catch(() => null);
-            if (d) setDigestPreview(d.text);
+            if (d) setDigestPreview(d.data);
           }}
         >
           📊 Weekly digest
@@ -1137,10 +1188,8 @@ function KidsTab({ client, notify }) {
       )}
 
       {digestPreview !== null && (
-        <Modal title="📊 Weekly digest" onClose={() => setDigestPreview(null)}>
-          <pre style={{ whiteSpace: 'pre-wrap', fontFamily: 'inherit', fontSize: 14, lineHeight: 1.5 }}>
-            {digestPreview}
-          </pre>
+        <Modal title="📊 This week" onClose={() => setDigestPreview(null)}>
+          <DigestView data={digestPreview} />
           <p style={{ fontSize: 13, color: '#4a5568' }}>
             Sends automatically every Sunday at 6pm when ntfy is configured.
           </p>
@@ -1334,8 +1383,27 @@ function KidsTab({ client, notify }) {
           <div style={{ marginTop: 6, fontSize: 13, color: '#4a5568' }}>
             {backups.length === 0
               ? 'No backups yet — the first one is written on boot.'
-              : `Latest: ${backups[0].file} (${Math.round(backups[0].size / 1024)} KB)`}
+              : 'Download a copy and keep it somewhere else — a snapshot that only lives on this machine is not really a backup.'}
           </div>
+          {/* Getting a copy off the box used to mean shelling in. */}
+          {backups.length > 0 && (
+            <ul className="backup-list">
+              {backups.slice(0, 5).map((b) => (
+                <li key={b.file}>
+                  <span>
+                    {b.file} <span style={{ color: '#718096' }}>({Math.round(b.size / 1024)} KB)</span>
+                  </span>
+                  <button
+                    className="btn secondary"
+                    onClick={() => downloadBackup(b.file)}
+                    aria-label={`Download ${b.file}`}
+                  >
+                    ⬇ Download
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
         </span>
         <button
           className="btn secondary"
@@ -1431,6 +1499,83 @@ const THEME_OPTIONS = [
   { key: 'fantasy', label: '🦄 Fantasy', avatar: '🦄' },
   { key: 'racing', label: '🏎️ Racing', avatar: '🏎️' },
 ];
+
+const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+/**
+ * The week as a chart rather than a text blob.
+ *
+ * "Which chores keep getting skipped" is the most useful thing this app knows
+ * about a household — it says which ones are mispriced or unrealistic — and it
+ * used to be buried in a <pre>. The per-kid bars make an off week visible at a
+ * glance instead of requiring you to compare numbers in prose.
+ */
+function DigestView({ data }) {
+  if (!data) return <p>Loading…</p>;
+  const { kids = [], missed = [], pendingNow = 0 } = data;
+  if (kids.length === 0) return <p>No kids on the chart yet.</p>;
+
+  // One scale across every kid, so the bars are comparable between them.
+  const peak = Math.max(1, ...kids.flatMap((k) => k.daily.map((d) => d.points)));
+
+  return (
+    <div className="digest">
+      {kids.map((kid) => (
+        <div key={kid.id} className="digest-kid">
+          <div className="digest-kid-head">
+            <strong>
+              {kid.icon} {kid.name}
+            </strong>
+            <span>
+              +{kid.earned} pts · {kid.approved} tasks
+              {kid.liveStreaks > 0 && ` · ${kid.liveStreaks} streak${kid.liveStreaks === 1 ? '' : 's'} 🔥`}
+              {kid.newBadges > 0 && ` · ${kid.newBadges} new 🏅`}
+            </span>
+          </div>
+          <div className="digest-bars">
+            {kid.daily.map((d) => {
+              const day = WEEKDAYS[new Date(`${d.date}T12:00:00`).getDay()];
+              return (
+                <div key={d.date} className="digest-bar" title={`${d.date}: ${d.points} points`}>
+                  <span className="digest-bar-value">{d.points || ''}</span>
+                  <span
+                    className="digest-bar-fill"
+                    style={{ height: `${Math.round((d.points / peak) * 100)}%` }}
+                  />
+                  <span className="digest-bar-day">{day}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+
+      {missed.length > 0 && (
+        <>
+          <h4 style={{ marginBottom: 6 }}>Most skipped this week</h4>
+          <p style={{ fontSize: 13, color: '#4a5568', marginTop: 0 }}>
+            Scheduled but not done. A chore near the top of this list every week is usually
+            worth more points, or worth dropping.
+          </p>
+          <ul className="digest-missed">
+            {missed.slice(0, 5).map((m) => (
+              <li key={m.title}>
+                <span>{m.title}</span>
+                <span className="digest-missed-count">{m.misses}×</span>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+
+      {pendingNow > 0 && (
+        <p className="digest-pending">
+          ⏳ {pendingNow} completion{pendingNow === 1 ? '' : 's'} waiting for approval right now.
+        </p>
+      )}
+    </div>
+  );
+}
 
 /**
  * Change a kid's avatar after creation. There was no way to do this at all

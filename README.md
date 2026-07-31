@@ -123,6 +123,48 @@ optional overrides for scripted deploys:
 | `APP_NAME`    | `Reward Chart`     | Fallback name before setup runs                           |
 | `NTFY_URL`    | *(unset)*          | ntfy topic URL for push notifications; unset disables     |
 | `BACKUP_KEEP` | `14`               | How many nightly database backups to retain               |
+| `PUBLIC_URL`  | *(unset)*          | Address your phone can reach the chart on; enables approve buttons in notifications |
+
+## Remote access for parents
+
+The chart is LAN-only by design and stays that way — the data never leaves the house.
+But that leaves a gap: ntfy tells you your kid did their chores while you're at work,
+and then you can't do anything about it until you're home.
+
+**The fix is a VPN overlay, not a port forward.** Tailscale puts your home server and
+your phone on the same private network, end-to-end encrypted, with no port forwarding,
+no inbound firewall holes, and no third party holding your family's data. The
+"data never leaves the house" promise stays literally true — you're just extending
+where "the house" reaches.
+
+### 10-minute setup
+
+1. **Install Tailscale on the machine running the chart** — <https://tailscale.com/download>.
+   Sign in; the machine joins your private tailnet.
+2. **Install Tailscale on the parents' phones** and sign in with the same account.
+3. **Find the server's tailnet address** — `tailscale ip -4` on the server, or read it
+   from the Tailscale admin console. It looks like `100.x.y.z`. Enabling MagicDNS gets
+   you a name like `chart-server` instead.
+4. **Check it works** — with your phone on mobile data (Wi-Fi off), open
+   `http://100.x.y.z:8090`. The chart should load exactly as it does at home.
+5. **Turn on one-tap approval** — put that same address into
+   **Parent dashboard → Settings → Approve from your phone** (or set `PUBLIC_URL`).
+   Push notifications now carry **✅ Approve** and **❌ Not yet** buttons, so a chore
+   can be approved straight from the notification without opening the app or typing the PIN.
+
+Those buttons carry a signed, single-use-shaped token: it authorises exactly one action
+on exactly one item, expires after 12 hours, and grants nothing else — it is not a login,
+and it cannot reach the rest of the parent API. Leave the address blank and notifications
+still arrive, just without buttons.
+
+### What about just forwarding a port?
+
+Not supported, deliberately. The current auth is a 4-digit PIN sent as a header over
+plain HTTP, and the kiosk API is unauthenticated by design because it's for kids on the
+sofa. That's fine on a home LAN and nowhere near good enough for the open internet.
+Making it internet-grade means TLS, session tokens, hashed credentials and CSRF
+protection — a different project. The VPN route gets you the whole benefit today
+without any of that risk.
 
 ## Tech stack & architecture
 
