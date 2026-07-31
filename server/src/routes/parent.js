@@ -19,7 +19,6 @@ import {
   freshStart,
 } from '../service.js';
 
-const THEMES = ['soccer', 'dino', 'space', 'fantasy', 'racing'];
 import { vacationState, setVacation } from '../vacation.js';
 import { listBackups, runBackup, backupFilePath } from '../backup.js';
 import { checkBadges } from '../badges.js';
@@ -35,6 +34,7 @@ import {
   setPublicUrl,
 } from '../config.js';
 import { clientKey, lockoutRemaining, recordFailure, recordSuccess } from '../pinGuard.js';
+import { isValidTheme } from '../themes.js';
 
 export const parent = Router();
 
@@ -447,7 +447,7 @@ parent.post('/kids', (req, res) => {
     !Number.isInteger(age) ||
     age < 1 ||
     age > 18 ||
-    !THEMES.includes(theme)
+    !isValidTheme(theme)
   ) {
     return res.status(400).json({ error: 'invalid_kid' });
   }
@@ -484,7 +484,7 @@ parent.patch('/kids/:id', (req, res) => {
     return res.status(400).json({ error: 'invalid_vault_config' });
   }
   const theme = req.body.theme ?? kid.theme;
-  if (!THEMES.includes(theme)) return res.status(400).json({ error: 'invalid_theme' });
+  if (!isValidTheme(theme)) return res.status(400).json({ error: 'invalid_theme' });
   const avatar_icon = req.body.avatar_icon ?? kid.avatar_icon;
   // secret_code: emoji string enables the kid lock; null/'' disables it.
   let secret_code = kid.secret_code;

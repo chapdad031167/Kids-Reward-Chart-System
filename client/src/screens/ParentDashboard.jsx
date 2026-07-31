@@ -5,6 +5,7 @@ import { useIdleTimer } from '../hooks.js';
 import { Modal, Toast } from '../components/ui.jsx';
 import EmojiPicker from '../components/EmojiPicker.jsx';
 import { CodePicker, CODE_LENGTH, CODE_EMOJIS } from '../components/KidCode.jsx';
+import { THEME_OPTIONS } from '../themes.js';
 
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -1491,14 +1492,6 @@ function FreshStartModal({ client, notify, onClose }) {
     </Modal>
   );
 }
-
-const THEME_OPTIONS = [
-  { key: 'soccer', label: '⚽ Soccer', avatar: '⚽' },
-  { key: 'dino', label: '🦖 Dinosaur', avatar: '🦖' },
-  { key: 'space', label: '🚀 Space', avatar: '🚀' },
-  { key: 'fantasy', label: '🦄 Fantasy', avatar: '🦄' },
-  { key: 'racing', label: '🏎️ Racing', avatar: '🏎️' },
-];
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 

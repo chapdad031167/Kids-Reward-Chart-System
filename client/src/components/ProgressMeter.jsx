@@ -377,10 +377,64 @@ function CastleMeter({ pct, complete }) {
   );
 }
 
+// ---------------------------------------------------------------- ocean
+
+/** Ship crosses the water to the island; finishing drops anchor there. */
+function VoyageMeter({ pct, complete }) {
+  const x = complete ? 150 : 18 + (pct / 100) * 118;
+  return (
+    <div className="scene-meter">
+      <svg
+        className="scene-svg wide"
+        viewBox="0 0 200 100"
+        aria-label={complete ? 'reached the island' : `ship ${pct}% of the way to the island`}
+      >
+        {/* sky and sea */}
+        <rect x="0" y="0" width="200" height="52" rx="6" fill="#7fd4ee" />
+        <rect x="0" y="46" width="200" height="54" rx="6" fill="#1789a8" />
+        <circle cx="30" cy="20" r="9" fill="#ffe08a" />
+        {/* swell */}
+        {[58, 72, 86].map((y, i) => (
+          <path
+            key={y}
+            d={`M${-6 + i * 4} ${y} q12 -5 24 0 t24 0 t24 0 t24 0 t24 0 t24 0 t24 0 t24 0`}
+            fill="none"
+            stroke="#ffffff"
+            strokeWidth="1.5"
+            opacity={0.3 - i * 0.07}
+          />
+        ))}
+        {/* island */}
+        <path d="M156 68 q18 -12 36 0 Z" fill="#e8d8a0" />
+        <path d="M172 66 l0 -16 M172 50 q-9 -3 -13 -9 M172 50 q9 -3 13 -9" stroke="#2f7d4f" strokeWidth="2.5" fill="none" strokeLinecap="round" />
+        {/* ship */}
+        <g style={{ transition: 'transform 0.8s cubic-bezier(0.22, 1, 0.36, 1)', transform: `translateX(${x - 18}px)` }}>
+          <path d="M8 66 h20 l-4 8 h-12 Z" fill="#8b5a2b" />
+          <line x1="18" y1="66" x2="18" y2="42" stroke="#5c3a1a" strokeWidth="2" />
+          <path d="M19 44 l12 9 l-12 6 Z" fill="#ffffff" />
+          <path d="M17 44 l-9 7 l9 5 Z" fill="#f2fbff" />
+        </g>
+      </svg>
+      <MeterNote>
+        {complete ? (
+          <strong>LAND HO! 🏝️</strong>
+        ) : (
+          <>
+            <strong>{pct}% of the way across</strong>
+            <br />
+            finish every task to reach the island!
+          </>
+        )}
+      </MeterNote>
+    </div>
+  );
+}
+
 const METERS = {
   egg: EggMeter,
   pitch: PitchMeter,
   rocket: RocketMeter,
   track: TrackMeter,
   castle: CastleMeter,
+  voyage: VoyageMeter,
 };

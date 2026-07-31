@@ -106,6 +106,16 @@ const SOUNDS = {
     tone(c, { freq: 1109, start: 0.95, dur: 0.25, type: 'square', gain: 0.12 });
   },
 
+  /** Ocean celebration: a breaking wave, a gull, and the ship's bell. */
+  wave(c) {
+    // Filtered noise swelling and falling is what reads as surf.
+    noiseBurst(c, { start: 0, dur: 0.9, gain: 0.12, freq: 600, q: 0.4, rise: 0.35 });
+    noiseBurst(c, { start: 0.45, dur: 0.6, gain: 0.06, freq: 1600, q: 0.5, rise: 0.2 }); // foam
+    tone(c, { freq: 1200, endFreq: 1600, start: 0.5, dur: 0.14, type: 'sine', gain: 0.07 }); // gull
+    tone(c, { freq: 1046, start: 0.85, dur: 0.5, type: 'sine', gain: 0.16 }); // ship's bell (C6)
+    tone(c, { freq: 1568, start: 0.88, dur: 0.45, type: 'sine', gain: 0.09 });
+  },
+
   /** Mystery reveal: shimmering magic arpeggio. */
   sparkle(c) {
     const notes = [880, 1109, 1319, 1760, 2217]; // A5 C#6 E6 A6 C#7

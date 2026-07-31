@@ -21,9 +21,16 @@ import { checkBadges, badgeState, markBadgesSeen, levelFor } from '../badges.js'
 import { getFamilyGoal } from '../familyGoal.js';
 import { isConfigured, markConfigured, getAppName, setAppName, setPin } from '../config.js';
 import { seedStarterContent } from '../seed.js';
+import { isValidTheme } from '../themes.js';
 
-const THEMES = ['soccer', 'dino', 'space', 'fantasy', 'racing'];
-const DEFAULT_AVATARS = { soccer: '⚽', dino: '🦖', space: '🚀', fantasy: '🦄', racing: '🏎️' };
+const DEFAULT_AVATARS = {
+  soccer: '⚽',
+  dino: '🦖',
+  space: '🚀',
+  fantasy: '🦄',
+  racing: '🏎️',
+  ocean: '⛵',
+};
 
 export const kiosk = Router();
 
@@ -53,7 +60,7 @@ kiosk.post('/setup', (req, res) => {
     !Number.isInteger(kid.age) ||
     kid.age < 1 ||
     kid.age > 18 ||
-    !THEMES.includes(kid.theme)
+    !isValidTheme(kid.theme)
   ) {
     return res.status(400).json({ error: 'invalid_kid' });
   }

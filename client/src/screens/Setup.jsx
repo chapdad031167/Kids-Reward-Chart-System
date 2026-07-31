@@ -1,14 +1,7 @@
 import { useState } from 'react';
 import { api } from '../api.js';
 import EmojiPicker from '../components/EmojiPicker.jsx';
-
-const THEME_OPTIONS = [
-  { key: 'soccer', label: '⚽ Soccer', avatar: '⚽' },
-  { key: 'dino', label: '🦖 Dinosaur', avatar: '🦖' },
-  { key: 'space', label: '🚀 Space', avatar: '🚀' },
-  { key: 'fantasy', label: '🦄 Fantasy', avatar: '🦄' },
-  { key: 'racing', label: '🏎️ Racing', avatar: '🏎️' },
-];
+import { THEME_OPTIONS } from '../themes.js';
 
 /**
  * First-run wizard, shown only while the instance is unconfigured. Names

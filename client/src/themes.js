@@ -76,9 +76,19 @@ const CHECKERS = texture(`
   </g>
 </svg>`);
 
+/** Rolling swell, the way a kid draws the sea. */
+const WAVES = texture(`
+<svg xmlns='http://www.w3.org/2000/svg' width='120' height='60'>
+  <g fill='none' stroke='#ffffff' stroke-width='2' stroke-linecap='round' opacity='0.07'>
+    <path d='M0 18 q15 -10 30 0 t30 0 t30 0 t30 0'/>
+    <path d='M0 42 q15 -10 30 0 t30 0 t30 0 t30 0'/>
+  </g>
+</svg>`);
+
 export const THEMES = {
   soccer: {
     key: 'soccer',
+    label: 'Soccer',
     colors: {
       bg: 'linear-gradient(160deg, #1b7a3d 0%, #2e9e56 55%, #1b6a38 100%)',
       card: '#ffffff',
@@ -133,6 +143,7 @@ export const THEMES = {
   },
   dino: {
     key: 'dino',
+    label: 'Dinosaur',
     colors: {
       bg: 'linear-gradient(160deg, #1f7a5c 0%, #2c9a74 55%, #14655f 100%)',
       card: '#fffaf0',
@@ -185,6 +196,7 @@ export const THEMES = {
   },
   space: {
     key: 'space',
+    label: 'Space',
     colors: {
       bg: 'linear-gradient(160deg, #1a1f4b 0%, #2d3585 55%, #141838 100%)',
       card: '#f4f6ff',
@@ -237,6 +249,7 @@ export const THEMES = {
   },
   fantasy: {
     key: 'fantasy',
+    label: 'Fantasy',
     colors: {
       bg: 'linear-gradient(160deg, #6d28a8 0%, #9b4fd1 55%, #55217f 100%)',
       card: '#fdf7ff',
@@ -289,6 +302,7 @@ export const THEMES = {
   },
   racing: {
     key: 'racing',
+    label: 'Racing',
     colors: {
       bg: 'linear-gradient(160deg, #8f1d1d 0%, #c23b2e 55%, #6e1414 100%)',
       card: '#fffdf7',
@@ -339,7 +353,75 @@ export const THEMES = {
     sound: 'vroom',
     progressStyle: 'track',
   },
+  ocean: {
+    key: 'ocean',
+    label: 'Ocean',
+    colors: {
+      bg: 'linear-gradient(160deg, #0b4f6c 0%, #1789a8 55%, #06394f 100%)',
+      card: '#f2fbff',
+      cardText: '#0a3a4d',
+      accent: '#ffc93c',
+      accentText: '#3d2f00',
+      meterFill: 'linear-gradient(90deg, #ffc93c, #ffe08a)',
+      chip: '#dff2f9',
+      headerText: '#ffffff',
+      texture: WAVES,
+    },
+    terms: {
+      celebration: 'AHOY!',
+      celebrationSub: 'Fine sailing!',
+      cheers: [
+        ['AHOY!', 'Fine sailing!'],
+        ['LAND HO!', 'Sharp eyes, sailor!'],
+        ['FULL SAIL!', 'The crew is cheering!'],
+        ['SHIVER ME TIMBERS!', 'That was seamanship!'],
+      ],
+      streak: 'Voyage Streak',
+      progress: 'Sail to the Island',
+      checking: 'Spending',
+      savings: 'Treasure Chest',
+      allDone: 'LAND HO — you reached the island! 🏝️',
+      rewards: 'Trading Post',
+      pendingBanner: 'Waiting for the captain to check it!',
+      rejectedBanner: 'Not this voyage — ask a grown-up',
+      mysteryTitle: 'Message in a Bottle!',
+      mysteryTap: 'Tap to pull out the scroll!',
+      bonus: 'BONUS',
+      goalTitle: 'My Treasure Goal',
+      goalReached: 'YOU DID IT! Go claim it at the Trading Post! 🏴‍☠️',
+      badges: 'Map Pieces',
+      familyGoal: 'Crew Goal',
+      levelTitles: ['Stowaway', 'Deckhand', 'Cabin Kid', 'Sailor', 'Navigator', 'Quartermaster', 'First Mate', 'Captain', 'Legend of the Seas'],
+      vacationTitle: 'Shore Leave! 🏖️',
+      vacationBody: 'The ship is in port — no chores today! Your Voyage Streaks are safe below deck until you set sail again.',
+    },
+    icons: {
+      mascot: '⛵',
+      streak: '🧭',
+      savings: '💎',
+      checking: '💰',
+      mystery: '🍾',
+    },
+    celebration: 'ocean',
+    sound: 'wave',
+    progressStyle: 'voyage',
+  },
 };
 
 // Task categories now live in the database (parent-editable) and arrive
 // with each /today payload — no hardcoded list here anymore.
+
+/**
+ * Options for every theme picker in the app.
+ *
+ * The parent dashboard and the setup wizard each used to carry their own
+ * hand-typed copy of this list, on top of the two validators on the server —
+ * four places to remember, which is how a theme ends up half-added. Deriving
+ * it here is what actually makes the README's "a new theme is a data change"
+ * claim true.
+ */
+export const THEME_OPTIONS = Object.values(THEMES).map((t) => ({
+  key: t.key,
+  label: `${t.icons.mascot} ${t.label}`,
+  avatar: t.icons.mascot,
+}));
