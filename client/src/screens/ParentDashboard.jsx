@@ -1,11 +1,15 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api, parentApi } from '../api.js';
+import { useIdleTimer } from '../hooks.js';
 import { Modal, Toast } from '../components/ui.jsx';
 import EmojiPicker from '../components/EmojiPicker.jsx';
 import { CodePicker, CODE_LENGTH, CODE_EMOJIS } from '../components/KidCode.jsx';
 
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+/** Idle time before the parent dashboard locks itself back up. */
+const PARENT_IDLE_MS = 5 * 60 * 1000;
 
 function scheduleSummary(days) {
   if (!days) return 'Every day';
@@ -42,6 +46,13 @@ function DayPicker({ value, onChange }) {
 
 export default function ParentDashboard({ onAppNameChange }) {
   const [pin, setPin] = useState(() => sessionStorage.getItem('parent-pin') || null);
+  // Stable so it can be a dependency of the dashboard's idle timer and API
+  // wrapper without re-arming them on every render.
+  const lock = useCallback(() => {
+    sessionStorage.removeItem('parent-pin');
+    setPin(null);
+  }, []);
+
   if (!pin) {
     return (
       <PinScreen
@@ -52,16 +63,7 @@ export default function ParentDashboard({ onAppNameChange }) {
       />
     );
   }
-  return (
-    <Dashboard
-      pin={pin}
-      onAppNameChange={onAppNameChange}
-      onLock={() => {
-        sessionStorage.removeItem('parent-pin');
-        setPin(null);
-      }}
-    />
-  );
+  return <Dashboard pin={pin} onAppNameChange={onAppNameChange} onLock={lock} />;
 }
 
 function PinScreen({ onVerified }) {
@@ -93,12 +95,23 @@ function PinScreen({ onVerified }) {
     let alive = true;
     api
       .post('/api/parent/verify', { pin: entered })
-      .catch(() => ({ ok: false }))
       .then((res) => {
         if (!alive) return;
         if (res.ok) return onVerified(entered);
         setEntered('');
-        setError('Wrong PIN — try again');
+        setError(
+          res.retry_after_s
+            ? `Too many tries — wait ${res.retry_after_s}s`
+            : 'Wrong PIN — try again'
+        );
+      })
+      .catch((err) => {
+        if (!alive) return;
+        setEntered('');
+        // 429 is the brute-force guard; anything else is the server being
+        // unreachable, which shouldn't read as a wrong PIN.
+        if (err.status === 429) setError('Too many tries — wait a moment');
+        else setError('Could not reach the chart — try again');
       });
     return () => {
       alive = false;
@@ -141,9 +154,38 @@ function Dashboard({ pin, onLock, onAppNameChange }) {
   const [vacation, setVacation] = useState(null); // {on, since}
   const [confirmingVacation, setConfirmingVacation] = useState(false);
   const navigate = useNavigate();
-  const client = parentApi(pin);
+
+  // A parent request coming back 401 means this session's PIN is dead — most
+  // often because it was changed on another device. Drop back to the keypad
+  // instead of letting the 15s queue poll keep retrying it: those retries
+  // count as failed attempts against the brute-force guard, and five of them
+  // would lock the family out of their own dashboard. 429 means the guard has
+  // already tripped, so stop hammering it and let the parent see the wait.
+  const client = useMemo(() => {
+    const raw = parentApi(pin);
+    const guard = (p) =>
+      p.catch((err) => {
+        if (err.status === 401 || err.status === 429) onLock();
+        throw err;
+      });
+    return {
+      get: (url) => guard(raw.get(url)),
+      post: (url, body) => guard(raw.post(url, body)),
+      patch: (url, body) => guard(raw.patch(url, body)),
+      delete: (url) => guard(raw.delete(url)),
+    };
+  }, [pin, onLock]);
 
   const notify = (msg) => setToast(msg);
+
+  // The kiosk tab is never closed, so a dashboard left open is a dashboard
+  // any kid can walk into. Lock it back up after a few idle minutes and
+  // return to the avatar screen, the same way the kid screens bounce back.
+  const lockAndLeave = useCallback(() => {
+    onLock();
+    navigate('/');
+  }, [onLock, navigate]);
+  useIdleTimer(lockAndLeave, PARENT_IDLE_MS);
 
   useEffect(() => {
     client.get('/api/parent/vacation').then(setVacation).catch(() => {});
@@ -173,7 +215,7 @@ function Dashboard({ pin, onLock, onAppNameChange }) {
             🏖️ Vacation: {vacation.on ? 'ON' : 'OFF'}
           </button>
         )}
-        <button className="btn secondary" onClick={() => navigate('/')}>
+        <button className="btn secondary" onClick={lockAndLeave}>
           Kiosk
         </button>
         <button className="btn secondary" onClick={onLock}>
@@ -240,6 +282,7 @@ function Dashboard({ pin, onLock, onAppNameChange }) {
 function SettingsTab({ client, notify, onAppNameChange }) {
   const [appName, setAppName] = useState('');
   const [loaded, setLoaded] = useState(false);
+  const [usingDefaultPin, setUsingDefaultPin] = useState(false);
   const [pin, setPinValue] = useState('');
   const [pin2, setPin2] = useState('');
 
@@ -248,6 +291,7 @@ function SettingsTab({ client, notify, onAppNameChange }) {
       .get('/api/parent/settings')
       .then((s) => {
         setAppName(s.appName);
+        setUsingDefaultPin(!!s.usingDefaultPin);
         setLoaded(true);
       })
       .catch(() => notify('Failed to load settings'));
@@ -275,6 +319,7 @@ function SettingsTab({ client, notify, onAppNameChange }) {
       await client.post('/api/parent/pin', { pin });
       // The PIN this session authenticated with is now stale.
       sessionStorage.setItem('parent-pin', pin);
+      setUsingDefaultPin(pin === '1234');
       setPinValue('');
       setPin2('');
       notify('PIN changed');
@@ -287,6 +332,15 @@ function SettingsTab({ client, notify, onAppNameChange }) {
 
   return (
     <div>
+      {usingDefaultPin && (
+        <div className="settings-warning">
+          <strong>⚠️ This chart is still using the default PIN (1234).</strong>
+          <div>
+            It's published in the setup docs, so anyone who knows the app can open this
+            dashboard. Pick your own below.
+          </div>
+        </div>
+      )}
       <h3 style={{ marginTop: 0 }}>Chart name</h3>
       <p style={{ fontSize: 14, color: '#4a5568' }}>Shown on the kids' home screen and the browser tab.</p>
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 24 }}>
@@ -338,6 +392,9 @@ function SettingsTab({ client, notify, onAppNameChange }) {
 
 function PendingTab({ client, notify }) {
   const [data, setData] = useState(null);
+  // Yesterday's taps stay approvable through today, so say which day a row is
+  // from — approving it credits that day and keeps the streak intact.
+  const todayKey = new Date().toLocaleDateString('en-CA');
 
   const load = useCallback(() => {
     client.get('/api/parent/pending').then(setData).catch(() => notify('Failed to load queue'));
@@ -372,7 +429,7 @@ function PendingTab({ client, notify }) {
         <button
           className="btn primary"
           disabled={data.completions.length === 0}
-          onClick={() => act('/api/parent/approve-all', 'Approved all of today’s tasks')}
+          onClick={() => act('/api/parent/approve-all', 'Approved everything waiting')}
         >
           ✅ Quick Approve All ({data.completions.length})
         </button>
@@ -388,6 +445,7 @@ function PendingTab({ client, notify }) {
           <span className="who">{c.kid_name}</span>
           <span className="what">
             {c.is_bonus ? '✨ ' : ''}{c.icon} {c.title} <strong>(+{c.point_value})</strong>
+            {c.date !== todayKey && <span className="day-tag">Yesterday</span>}
             <br />
             <small>{new Date(c.completed_at).toLocaleTimeString()}</small>
           </span>

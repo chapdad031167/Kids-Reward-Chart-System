@@ -1720,3 +1720,28 @@ button {
     grid-template-columns: repeat(2, 1fr);
   }
 }
+
+/* ---------- Parent: pending day tag & settings warning ---------- */
+
+.day-tag {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #fde68a;
+  color: #713f12;
+  font-size: 12px;
+  font-weight: 700;
+  vertical-align: middle;
+}
+
+.settings-warning {
+  background: #fef3c7;
+  border: 2px solid #f59e0b;
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin-bottom: 20px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #713f12;
+}

@@ -1,13 +1,13 @@
 import { Router } from 'express';
 import { db, balances } from '../db.js';
-import { todayStr } from '../dates.js';
 import {
   expireStalePending,
   approveCompletion,
   rejectCompletion,
   approveRedemption,
   rejectRedemption,
-  approveAllToday,
+  approveAllPending,
+  oldestApprovableDate,
   undoLastAction,
   transferPoints,
   resetKidDay,
@@ -24,24 +24,47 @@ import { listBackups, runBackup } from '../backup.js';
 import { checkBadges } from '../badges.js';
 import { getFamilyGoal, setFamilyGoal } from '../familyGoal.js';
 import { buildDigest, sendDigest } from '../digest.js';
-import { getPin, setPin, getAppName, setAppName } from '../config.js';
+import { getPin, setPin, getAppName, setAppName, isDefaultPin } from '../config.js';
+import { clientKey, lockoutRemaining, recordFailure, recordSuccess } from '../pinGuard.js';
 
 export const parent = Router();
 
+function lockedOut(req, res) {
+  const wait = lockoutRemaining(clientKey(req));
+  if (wait <= 0) return false;
+  res.status(429).json({ error: 'too_many_attempts', retry_after_s: Math.ceil(wait / 1000) });
+  return true;
+}
+
 parent.post('/verify', (req, res) => {
-  res.json({ ok: (req.body?.pin ?? '') === getPin() });
+  if (lockedOut(req, res)) return;
+  const key = clientKey(req);
+  if ((req.body?.pin ?? '') === getPin()) {
+    recordSuccess(key);
+    return res.json({ ok: true });
+  }
+  const wait = recordFailure(key);
+  res.json({ ok: false, ...(wait > 0 ? { retry_after_s: Math.ceil(wait / 1000) } : {}) });
 });
 
-// Every route below requires the PIN header.
+// Every route below requires the PIN header. The same guard applies here, so
+// the throttle can't be sidestepped by skipping /verify and hammering the
+// header against a real endpoint.
 parent.use((req, res, next) => {
-  if (req.get('x-parent-pin') !== getPin()) return res.status(401).json({ error: 'bad_pin' });
+  if (lockedOut(req, res)) return;
+  const key = clientKey(req);
+  if (req.get('x-parent-pin') !== getPin()) {
+    recordFailure(key);
+    return res.status(401).json({ error: 'bad_pin' });
+  }
+  recordSuccess(key);
   next();
 });
 
 // ---- Instance settings ----
 
 parent.get('/settings', (req, res) => {
-  res.json({ appName: getAppName() });
+  res.json({ appName: getAppName(), usingDefaultPin: isDefaultPin() });
 });
 
 parent.post('/settings', (req, res) => {
@@ -69,10 +92,10 @@ parent.get('/pending', (req, res) => {
        FROM completions c
        JOIN kids k ON k.id = c.kid_id
        JOIN tasks t ON t.id = c.task_id
-       WHERE c.status = 'pending' AND c.date = ?
-       ORDER BY c.completed_at`
+       WHERE c.status = 'pending' AND c.date >= ?
+       ORDER BY c.date, c.completed_at`
     )
-    .all(todayStr());
+    .all(oldestApprovableDate());
   const redemptions = db
     .prepare(
       `SELECT r.id, r.cost_paid, r.redeemed_at, k.name AS kid_name, k.id AS kid_id,
@@ -159,7 +182,7 @@ parent.post('/redemptions/:id/reject', (req, res) => {
 });
 
 parent.post('/approve-all', (req, res) => {
-  const approved = approveAllToday();
+  const approved = approveAllPending();
   for (const kid of db.prepare(`SELECT id FROM kids`).all()) checkBadges(kid.id);
   res.json({ ok: true, approved });
 });

@@ -4,13 +4,26 @@ import { prevExpectedDay } from './schedule.js';
 import { getSetting, setSetting } from './vacation.js';
 
 /**
- * Lazy daily housekeeping: pending completions from prior days expire.
- * The row stays in `completions` for parent visibility; it just can no
- * longer be approved or earn points.
+ * The oldest date still inside the approval grace window.
+ *
+ * Taps used to expire the instant the date rolled over, which punished the
+ * kid for the parent's timing: bedtime chores tapped at 8pm, the parent falls
+ * asleep before approving, and by morning the work is expired, invisible in
+ * the queue, worth nothing, and the streak is broken. Yesterday's pending
+ * work now stays approvable for the whole of today.
+ */
+export function oldestApprovableDate() {
+  return prevDay(todayStr());
+}
+
+/**
+ * Lazy daily housekeeping: pending completions older than the grace window
+ * expire. The row stays in `completions` for parent visibility; it just can
+ * no longer be approved or earn points.
  */
 export function expireStalePending() {
   db.prepare(`UPDATE completions SET status = 'expired' WHERE status = 'pending' AND date < ?`).run(
-    todayStr()
+    oldestApprovableDate()
   );
 }
 
@@ -86,18 +99,27 @@ function approveCompletionInner(completionId) {
   const prevStreak =
     db.prepare(`SELECT * FROM streaks WHERE task_id = ? AND kid_id = ?`).get(task.id, kid.id) || null;
 
-  let current = 1;
-  if (prevStreak && prevStreak.last_completed_date === completion.date) {
+  const last = prevStreak?.last_completed_date || null;
+  let current;
+  if (!last) {
+    current = 1;
+  } else if (last === completion.date) {
+    // Re-approving the same day (e.g. after an undo) never advances it.
     current = prevStreak.current_streak;
-  } else if (
-    prevStreak &&
-    prevStreak.last_completed_date &&
-    prevStreak.last_completed_date >= prevExpectedDay(task.days, completion.date)
-  ) {
+  } else if (last > completion.date) {
+    // Backfilling an older day after a newer one already landed — possible
+    // now that yesterday stays approvable. The chain was already advanced by
+    // the newer day, so leave it alone rather than counting the day twice.
+    current = prevStreak.current_streak;
+  } else if (last >= prevExpectedDay(task.days, completion.date)) {
     // Chain continues across vacation days and unscheduled days.
     current = prevStreak.current_streak + 1;
+  } else {
+    current = 1;
   }
   const longest = Math.max(current, prevStreak ? prevStreak.longest_streak : 0);
+  // Never walk the anchor backwards when an older day is approved late.
+  const anchor = last && last > completion.date ? last : completion.date;
 
   db.prepare(
     `INSERT INTO streaks (task_id, kid_id, current_streak, longest_streak, last_completed_date)
@@ -106,7 +128,7 @@ function approveCompletionInner(completionId) {
        current_streak = excluded.current_streak,
        longest_streak = excluded.longest_streak,
        last_completed_date = excluded.last_completed_date`
-  ).run(task.id, kid.id, current, longest, completion.date);
+  ).run(task.id, kid.id, current, longest, anchor);
 
   return { completionId, ledgerIds, prevStreak, taskId: task.id, kidId: kid.id };
 }
@@ -165,11 +187,15 @@ export const rejectRedemption = db.transaction((redemptionId) => {
   return info.changes > 0;
 });
 
-/** Approve every pending completion for today, as one undoable action. */
-export const approveAllToday = db.transaction(() => {
+/**
+ * Approve every completion still inside the approval window, as one undoable
+ * action. Matches what the parent queue shows — including yesterday's
+ * leftovers — so the button's count and its effect can't disagree.
+ */
+export const approveAllPending = db.transaction(() => {
   const pending = db
-    .prepare(`SELECT id FROM completions WHERE status = 'pending' AND date = ?`)
-    .all(todayStr());
+    .prepare(`SELECT id FROM completions WHERE status = 'pending' AND date >= ? ORDER BY date, id`)
+    .all(oldestApprovableDate());
   const items = [];
   for (const row of pending) {
     const undo = approveCompletionInner(row.id);
@@ -311,10 +337,20 @@ export const adjustBalance = db.transaction((kidId, bucket, amount) => {
 export const awardPoints = db.transaction((kidIds, amount, note) => {
   if (!Number.isInteger(amount) || amount <= 0) return { ok: false, reason: 'invalid_amount' };
   if (!Array.isArray(kidIds) || kidIds.length === 0) return { ok: false, reason: 'no_kids' };
-  const source = `award:${(note || '').trim().slice(0, 80) || 'bonus'}`;
+
+  // Resolve every kid BEFORE writing anything. A plain `return` from inside a
+  // better-sqlite3 transaction commits whatever was already inserted — only a
+  // throw rolls back — so validating inside the insert loop used to pay the
+  // earlier kids and still report the whole award as failed.
+  const kids = [];
   for (const kidId of kidIds) {
     const kid = db.prepare(`SELECT * FROM kids WHERE id = ?`).get(kidId);
     if (!kid) return { ok: false, reason: 'kid_not_found' };
+    kids.push(kid);
+  }
+
+  const source = `award:${(note || '').trim().slice(0, 80) || 'bonus'}`;
+  for (const kid of kids) {
     const split = splitEarnings(kid, amount);
     insertLedger(kid.id, split.checking, 'earn', 'checking', source);
     insertLedger(kid.id, split.savings, 'earn', 'savings', source);

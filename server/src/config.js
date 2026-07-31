@@ -17,9 +17,25 @@ export function setAppName(name) {
   setSetting('app_name', String(name).trim().slice(0, 60));
 }
 
+/**
+ * The well-known fallback. Published in the README and docker-compose, so any
+ * household still on it effectively has no parent lock at all.
+ */
+export const DEFAULT_PIN = '1234';
+
 /** Settings PIN wins; else env PARENT_PIN; else the well-known default. */
 export function getPin() {
-  return getSetting('parent_pin') || process.env.PARENT_PIN || '1234';
+  return getSetting('parent_pin') || process.env.PARENT_PIN || DEFAULT_PIN;
+}
+
+/**
+ * True when the effective PIN is still the published default — whether it was
+ * never set (installs predating the setup wizard get marked configured
+ * automatically) or a family deliberately chose 1234. Either way it's worth
+ * saying so out loud in Settings.
+ */
+export function isDefaultPin() {
+  return getPin() === DEFAULT_PIN;
 }
 
 export function setPin(pin) {
