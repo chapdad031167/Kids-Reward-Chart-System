@@ -21,11 +21,19 @@ import {
 
 const THEMES = ['soccer', 'dino', 'space', 'fantasy', 'racing'];
 import { vacationState, setVacation } from '../vacation.js';
-import { listBackups, runBackup } from '../backup.js';
+import { listBackups, runBackup, backupFilePath } from '../backup.js';
 import { checkBadges } from '../badges.js';
 import { getFamilyGoal, setFamilyGoal } from '../familyGoal.js';
-import { buildDigest, sendDigest } from '../digest.js';
-import { getPin, setPin, getAppName, setAppName, isDefaultPin } from '../config.js';
+import { buildDigest, sendDigest, digestData } from '../digest.js';
+import {
+  getPin,
+  setPin,
+  getAppName,
+  setAppName,
+  isDefaultPin,
+  getPublicUrl,
+  setPublicUrl,
+} from '../config.js';
 import { clientKey, lockoutRemaining, recordFailure, recordSuccess } from '../pinGuard.js';
 
 export const parent = Router();
@@ -65,14 +73,26 @@ parent.use((req, res, next) => {
 // ---- Instance settings ----
 
 parent.get('/settings', (req, res) => {
-  res.json({ appName: getAppName(), usingDefaultPin: isDefaultPin() });
+  res.json({
+    appName: getAppName(),
+    usingDefaultPin: isDefaultPin(),
+    publicUrl: getPublicUrl(),
+  });
 });
 
 parent.post('/settings', (req, res) => {
   if (typeof req.body?.appName === 'string' && req.body.appName.trim().length > 0) {
     setAppName(req.body.appName);
   }
-  res.json({ ok: true, appName: getAppName() });
+  // Empty string is meaningful here: it turns the notification buttons off.
+  if (typeof req.body?.publicUrl === 'string') {
+    const url = req.body.publicUrl.trim();
+    if (url && !/^https?:\/\/\S+$/i.test(url)) {
+      return res.status(400).json({ error: 'invalid_public_url' });
+    }
+    setPublicUrl(url);
+  }
+  res.json({ ok: true, appName: getAppName(), publicUrl: getPublicUrl() });
 });
 
 parent.post('/pin', (req, res) => {
@@ -234,7 +254,9 @@ parent.post('/fresh-start', async (req, res) => {
 // ---- Weekly digest ----
 
 parent.get('/digest', (req, res) => {
-  res.json({ text: buildDigest() });
+  // Both shapes: `text` is what ntfy would send, `data` is what the dashboard
+  // charts. Same numbers either way — they come from one builder.
+  res.json({ text: buildDigest(), data: digestData() });
 });
 
 parent.post('/digest', (req, res) => {
@@ -254,6 +276,17 @@ parent.post('/backups', async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: 'backup_failed', message: err.message });
   }
+});
+
+/**
+ * Download a backup. Getting a copy off the box previously meant shelling in,
+ * which makes the backups a lot less reassuring than they look — a snapshot
+ * that only exists on the machine that might die isn't really a backup.
+ */
+parent.get('/backups/:name/download', (req, res) => {
+  const file = backupFilePath(req.params.name);
+  if (!file) return res.status(404).json({ error: 'no_such_backup' });
+  res.download(file, req.params.name);
 });
 
 // ---- Vacation mode ----

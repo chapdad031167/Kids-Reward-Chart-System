@@ -42,6 +42,22 @@ export function setPin(pin) {
   setSetting('parent_pin', String(pin));
 }
 
+/**
+ * Base URL a parent's phone can actually reach this server on — typically the
+ * Tailscale address (see "Remote access" in the README). Only used to build
+ * the approve/reject buttons in push notifications; when it's unset the
+ * notifications still send, just without buttons, because a button pointing
+ * at an unreachable host is worse than no button.
+ */
+export function getPublicUrl() {
+  const raw = getSetting('public_url') || process.env.PUBLIC_URL || '';
+  return raw.trim().replace(/\/+$/, '');
+}
+
+export function setPublicUrl(url) {
+  setSetting('public_url', String(url).trim().replace(/\/+$/, '').slice(0, 200));
+}
+
 export function isConfigured() {
   return getSetting('household_configured') === '1';
 }

@@ -115,5 +115,18 @@ export function parentApi(pin) {
     post: (url, body) => request(url, { method: 'POST', body, headers }),
     patch: (url, body) => request(url, { method: 'PATCH', body, headers }),
     delete: (url) => request(url, { method: 'DELETE', headers }),
+    /**
+     * Binary fetch, for backup downloads. A plain <a href> can't carry the
+     * PIN header, so the file comes back as a blob and is saved client-side.
+     */
+    blob: async (url) => {
+      const res = await fetch(url, { headers });
+      if (!res.ok) {
+        const err = new Error(`http_${res.status}`);
+        err.status = res.status;
+        throw err;
+      }
+      return res.blob();
+    },
   };
 }
