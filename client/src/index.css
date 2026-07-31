@@ -18,10 +18,28 @@ body {
   user-select: none;
 }
 
+/* The kiosk wants no accidental text selection from stray drags, but the
+   parent dashboard is a working screen — backup filenames, ntfy topics and
+   digest text all need to be copyable. */
+.parent-shell,
+.parent-shell input,
+.parent-shell textarea {
+  user-select: text;
+}
+
 button {
   font-family: inherit;
   border: none;
   cursor: pointer;
+}
+
+/* No focus styling existed anywhere, so keyboard and switch-access users had
+   only whatever the browser happened to draw. :focus-visible keeps it out of
+   the way of touch taps on the kiosk. */
+:focus-visible {
+  outline: 3px solid #2563eb;
+  outline-offset: 2px;
+  border-radius: 4px;
 }
 
 /* ---------- Avatar select ---------- */
@@ -1463,7 +1481,9 @@ button {
 }
 
 .icon-btn.approve { background: #c6f6d5; }
-.icon-btn.reject { background: #fed7d7; }
+/* Opposite-consequence action sitting right next to approve — push it away so
+   a mis-tap is less likely, since rejection isn't covered by undo. */
+.icon-btn.reject { background: #fed7d7; margin-left: 10px; }
 
 .mgmt-table {
   width: 100%;
@@ -1744,4 +1764,27 @@ button {
   font-size: 14px;
   line-height: 1.5;
   color: #713f12;
+}
+
+/* Kid avatar in the parent list, doubling as the "change avatar" control. */
+.avatar-edit-btn {
+  background: none;
+  padding: 2px 6px;
+  font-size: 34px;
+  line-height: 1;
+  border-radius: 12px;
+}
+
+.avatar-edit-btn:hover {
+  background: #edf2f7;
+}
+
+.ledger-plus {
+  color: #276749;
+  font-weight: 700;
+}
+
+.ledger-minus {
+  color: #9b2c2c;
+  font-weight: 700;
 }
