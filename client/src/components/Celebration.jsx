@@ -72,6 +72,12 @@ export default function Celebration({ theme, onDone }) {
             <span className="magic-crown">👑</span>
           </>
         )}
+        {theme.celebration === 'ocean' && (
+          <>
+            <span className="wave-island">🏝️</span>
+            <span className="wave-ship">⛵</span>
+          </>
+        )}
         {theme.celebration === 'racing' && (
           <>
             <span className="race-flag">🏁</span>

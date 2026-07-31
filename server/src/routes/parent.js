@@ -19,7 +19,6 @@ import {
   freshStart,
 } from '../service.js';
 
-const THEMES = ['soccer', 'dino', 'space', 'fantasy', 'racing'];
 import { vacationState, setVacation } from '../vacation.js';
 import { listBackups, runBackup, backupFilePath } from '../backup.js';
 import { checkBadges } from '../badges.js';
@@ -35,6 +34,13 @@ import {
   setPublicUrl,
 } from '../config.js';
 import { clientKey, lockoutRemaining, recordFailure, recordSuccess } from '../pinGuard.js';
+import { isValidTheme } from '../themes.js';
+import {
+  grantFreezeToken,
+  freezeHistory,
+  listBreakDays,
+  setBreakDay,
+} from '../streakFreeze.js';
 
 export const parent = Router();
 
@@ -263,6 +269,98 @@ parent.post('/digest', (req, res) => {
   res.json({ ok: true, text: sendDigest() });
 });
 
+/** A daily cap of 0, '' or nonsense means "no cap" — stored as NULL. */
+function dailyLimit(value) {
+  const n = Number(value);
+  return Number.isInteger(n) && n > 0 ? n : null;
+}
+
+// ---- Streak freezes ----
+
+/**
+ * Hand a kid a streak-freeze token. Deliberately parent-granted rather than
+ * purchasable: a token a kid can buy with points is just a discount on
+ * quitting, whereas one a parent gives is a reward for a good run.
+ */
+parent.post('/kids/:id/freeze-tokens', (req, res) => {
+  const kid = db.prepare(`SELECT id FROM kids WHERE id = ?`).get(req.params.id);
+  if (!kid) return res.status(404).json({ error: 'kid_not_found' });
+  const delta = Number(req.body?.delta ?? 1);
+  if (!Number.isInteger(delta) || delta === 0 || Math.abs(delta) > 10) {
+    return res.status(400).json({ error: 'invalid_delta' });
+  }
+  res.json({ ok: true, tokens: grantFreezeToken(kid.id, delta), history: freezeHistory(kid.id) });
+});
+
+// ---- Break days (school calendar) ----
+
+parent.get('/break-days', (req, res) => {
+  res.json(listBreakDays());
+});
+
+/**
+ * Mark a date as a break day: tasks still appear, but missing them doesn't
+ * break a streak. Vacation mode pauses the chart entirely; this is the
+ * lighter tool for a school holiday where the routine is just looser.
+ */
+parent.post('/break-days', (req, res) => {
+  const { date, label, on } = req.body || {};
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(date ?? ''))) {
+    return res.status(400).json({ error: 'invalid_date' });
+  }
+  res.json({ ok: true, days: setBreakDay(date, label, on !== false) });
+});
+
+// ---- CSV export ----
+
+/** RFC-4180-ish quoting: double the quotes, wrap anything risky. */
+function csvCell(value) {
+  const s = value === null || value === undefined ? '' : String(value);
+  return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+function sendCsv(res, filename, header, rows) {
+  const body = [header, ...rows].map((r) => r.map(csvCell).join(',')).join('\r\n');
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+  res.type('text/csv').send(body);
+}
+
+/**
+ * Everything the chart knows, as spreadsheets. The data is the family's; it
+ * shouldn't take a SQLite client to get at it.
+ */
+parent.get('/export/ledger.csv', (req, res) => {
+  const rows = db
+    .prepare(
+      `SELECT l.created_at, k.name AS kid, l.direction, l.bucket, l.amount, l.source
+       FROM points_ledger l JOIN kids k ON k.id = l.kid_id
+       ORDER BY l.id`
+    )
+    .all();
+  sendCsv(
+    res,
+    'reward-chart-ledger.csv',
+    ['when', 'kid', 'direction', 'bucket', 'points', 'source'],
+    rows.map((r) => [r.created_at, r.kid, r.direction, r.bucket, r.amount, r.source])
+  );
+});
+
+parent.get('/export/completions.csv', (req, res) => {
+  const rows = db
+    .prepare(
+      `SELECT c.date, k.name AS kid, t.title, t.point_value, c.status, c.completed_at, c.reviewed_at
+       FROM completions c JOIN kids k ON k.id = c.kid_id JOIN tasks t ON t.id = c.task_id
+       ORDER BY c.date, c.id`
+    )
+    .all();
+  sendCsv(
+    res,
+    'reward-chart-completions.csv',
+    ['date', 'kid', 'task', 'points', 'status', 'tapped', 'reviewed'],
+    rows.map((r) => [r.date, r.kid, r.title, r.point_value, r.status, r.completed_at, r.reviewed_at])
+  );
+});
+
 // ---- Backups ----
 
 parent.get('/backups', (req, res) => {
@@ -403,13 +501,13 @@ function validRewardBody(body) {
 
 parent.post('/rewards', (req, res) => {
   if (!validRewardBody(req.body)) return res.status(400).json({ error: 'invalid_reward' });
-  const { title, cost, bucket_required, icon, kid_id } = req.body;
+  const { title, cost, bucket_required, icon, kid_id, limit_per_day } = req.body;
   const info = db
     .prepare(
-      `INSERT INTO rewards_catalog (kid_id, title, cost, bucket_required, icon, active)
-       VALUES (?, ?, ?, ?, ?, 1)`
+      `INSERT INTO rewards_catalog (kid_id, title, cost, bucket_required, icon, active, limit_per_day)
+       VALUES (?, ?, ?, ?, ?, 1, ?)`
     )
-    .run(kid_id || null, title.trim(), cost, bucket_required, icon || '🎁');
+    .run(kid_id || null, title.trim(), cost, bucket_required, icon || '🎁', dailyLimit(limit_per_day));
   res.status(201).json(db.prepare(`SELECT * FROM rewards_catalog WHERE id = ?`).get(info.lastInsertRowid));
 });
 
@@ -423,11 +521,13 @@ parent.patch('/rewards/:id', (req, res) => {
     icon: req.body.icon ?? reward.icon,
     active: req.body.active !== undefined ? (req.body.active ? 1 : 0) : reward.active,
     kid_id: req.body.kid_id !== undefined ? req.body.kid_id : reward.kid_id,
+    limit_per_day:
+      req.body.limit_per_day !== undefined ? dailyLimit(req.body.limit_per_day) : reward.limit_per_day,
   };
   if (!validRewardBody(merged)) return res.status(400).json({ error: 'invalid_reward' });
   db.prepare(
-    `UPDATE rewards_catalog SET title = ?, cost = ?, bucket_required = ?, icon = ?, active = ?, kid_id = ? WHERE id = ?`
-  ).run(merged.title.trim(), merged.cost, merged.bucket_required, merged.icon, merged.active, merged.kid_id, reward.id);
+    `UPDATE rewards_catalog SET title = ?, cost = ?, bucket_required = ?, icon = ?, active = ?, kid_id = ?, limit_per_day = ? WHERE id = ?`
+  ).run(merged.title.trim(), merged.cost, merged.bucket_required, merged.icon, merged.active, merged.kid_id, merged.limit_per_day, reward.id);
   res.json(db.prepare(`SELECT * FROM rewards_catalog WHERE id = ?`).get(reward.id));
 });
 
@@ -447,7 +547,7 @@ parent.post('/kids', (req, res) => {
     !Number.isInteger(age) ||
     age < 1 ||
     age > 18 ||
-    !THEMES.includes(theme)
+    !isValidTheme(theme)
   ) {
     return res.status(400).json({ error: 'invalid_kid' });
   }
@@ -484,8 +584,19 @@ parent.patch('/kids/:id', (req, res) => {
     return res.status(400).json({ error: 'invalid_vault_config' });
   }
   const theme = req.body.theme ?? kid.theme;
-  if (!THEMES.includes(theme)) return res.status(400).json({ error: 'invalid_theme' });
+  if (!isValidTheme(theme)) return res.status(400).json({ error: 'invalid_theme' });
   const avatar_icon = req.body.avatar_icon ?? kid.avatar_icon;
+  // Points→money: cents per point, 0 turns the display off entirely. Capped
+  // low on purpose — this is meant to make points feel concrete, not to turn
+  // the chart into a payroll system.
+  let cents_per_point = kid.cents_per_point;
+  if (req.body.cents_per_point !== undefined) {
+    const cents = Number(req.body.cents_per_point);
+    if (!Number.isInteger(cents) || cents < 0 || cents > 1000) {
+      return res.status(400).json({ error: 'invalid_cents_per_point' });
+    }
+    cents_per_point = cents;
+  }
   // secret_code: emoji string enables the kid lock; null/'' disables it.
   let secret_code = kid.secret_code;
   if (req.body.secret_code !== undefined) {
@@ -495,8 +606,8 @@ parent.patch('/kids/:id', (req, res) => {
     else return res.status(400).json({ error: 'invalid_secret_code' });
   }
   db.prepare(
-    `UPDATE kids SET vault_mode = ?, auto_split_ratio = ?, secret_code = ?, theme = ?, avatar_icon = ? WHERE id = ?`
-  ).run(vault_mode, ratio, secret_code, theme, avatar_icon, kid.id);
+    `UPDATE kids SET vault_mode = ?, auto_split_ratio = ?, secret_code = ?, theme = ?, avatar_icon = ?, cents_per_point = ? WHERE id = ?`
+  ).run(vault_mode, ratio, secret_code, theme, avatar_icon, cents_per_point, kid.id);
   res.json(db.prepare(`SELECT * FROM kids WHERE id = ?`).get(kid.id));
 });
 

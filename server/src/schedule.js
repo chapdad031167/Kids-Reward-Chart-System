@@ -1,5 +1,6 @@
 import { prevDay, dayOfWeek } from './dates.js';
 import { isVacationDay } from './vacation.js';
+import { isFrozenDay, isBreakDay } from './streakFreeze.js';
 
 /**
  * Task scheduling: tasks.days is a string of weekday digits (0=Sun…6=Sat)
@@ -15,12 +16,23 @@ export function isScheduledOn(days, dateStr) {
 
 /**
  * The most recent day before `date` on which this task was expected:
- * skips vacation days and days outside the task's schedule.
+ * skips vacation days, school break days, days outside the task's schedule,
+ * and — when a kid is given — any day that kid's streak freeze covered.
+ *
+ * `kidId` is optional so existing callers that genuinely have no kid in hand
+ * keep working; passing it is what makes a spent freeze actually protect the
+ * chain rather than just being recorded.
  */
-export function prevExpectedDay(days, date) {
+export function prevExpectedDay(days, date, kidId = null) {
   let day = prevDay(date);
   let guard = 0;
-  while ((isVacationDay(day) || !isScheduledOn(days, day)) && guard++ < 400) {
+  while (
+    (isVacationDay(day) ||
+      isBreakDay(day) ||
+      isFrozenDay(kidId, day) ||
+      !isScheduledOn(days, day)) &&
+    guard++ < 400
+  ) {
     day = prevDay(day);
   }
   return day;

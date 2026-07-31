@@ -7,7 +7,7 @@
   "scripts": {
     "start": "node src/index.js",
     "seed": "node src/seed.js",
-    "test": "DATA_DIR=$(mktemp -d) node test/p0.test.mjs && DATA_DIR=$(mktemp -d) node test/p1.test.mjs && DATA_DIR=$(mktemp -d) node test/p3.test.mjs"
+    "test": "DATA_DIR=$(mktemp -d) node test/p0.test.mjs && DATA_DIR=$(mktemp -d) node test/p1.test.mjs && DATA_DIR=$(mktemp -d) node test/p3.test.mjs && DATA_DIR=$(mktemp -d) node test/p4.test.mjs && DATA_DIR=$(mktemp -d) node test/p4b.test.mjs"
   },
   "dependencies": {
     "better-sqlite3": "^12.11.1",
