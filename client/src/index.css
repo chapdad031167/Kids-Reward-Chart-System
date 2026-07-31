@@ -96,23 +96,42 @@ button {
   gap: 40px;
   flex-wrap: wrap;
   justify-content: center;
+  /* On a phone the screen's contents are taller than the viewport, and a
+     flex item shrinks below its content by default — which squeezed the
+     tiles until the teasers were pressed against the bottom border. Let the
+     page scroll instead of compressing the thing people came to tap. */
+  flex-shrink: 0;
 }
 
 .avatar-btn {
   width: min(280px, 40vw);
   min-width: 200px;
-  aspect-ratio: 1;
+  flex-shrink: 0;
+  padding: 0;
   border-radius: 32px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
+  display: block;
   font-size: 28px;
   font-weight: 700;
   color: #fff;
   transition: transform 0.15s ease;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+}
+
+/* The tile's layout lives on this inner span, not on the button.
+   Two reasons, both learned the hard way:
+   - A <button> that is its own flex container doesn't grow to include its
+     padding, so the teasers row was clipped off the bottom edge.
+   - min-height rather than aspect-ratio: the tile still reads as a square,
+     but a kid with a secret code has one more thing to show, and a hard
+     ratio plus overflow:hidden guillotined whatever didn't fit. */
+.avatar-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: min(280px, 40vw);
+  padding: 18px 14px;
 }
 
 .avatar-btn:active {
@@ -123,13 +142,17 @@ button {
    Sits behind the contents so the emoji and teasers stay crisp. */
 .avatar-btn {
   position: relative;
-  overflow: hidden;
+  /* Deliberately NOT overflow:hidden. Making the tile a scroll container
+     stopped it growing to fit its own contents, which is what clipped the
+     teasers off the bottom on a phone. The texture is a positioned
+     pseudo-element, so it can round its own corners instead. */
 }
 
 .avatar-btn::before {
   content: '';
   position: absolute;
   inset: 0;
+  border-radius: inherit;
   background-image: var(--tile-texture, none);
   pointer-events: none;
 }
@@ -236,9 +259,21 @@ button {
   background: rgba(255, 255, 255, 0.3);
 }
 
+.avatar-name {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  /* A long name wraps instead of pushing the tile wider than its neighbour. */
+  max-width: 100%;
+  text-align: center;
+  line-height: 1.15;
+}
+
 .avatar-lock {
   font-size: 20px;
   opacity: 0.9;
+  flex: 0 0 auto;
 }
 
 /* ---------- First-run setup wizard ---------- */

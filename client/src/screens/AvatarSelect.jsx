@@ -59,28 +59,39 @@ export default function AvatarSelect({ appName = 'Reward Chart' }) {
             style={{ '--tile-texture': THEMES[kid.theme]?.colors.texture || 'none' }}
             onClick={() => onTapAvatar(kid)}
           >
-            <span className="avatar-emoji">{kid.avatar_icon}</span>
-            {kid.name}
-            {kid.has_code && (
-              <span className="avatar-lock" role="img" aria-label="has a secret code">
-                🔒
-              </span>
-            )}
-            {/* The pull: what's actually waiting behind this tile. */}
-            <span className="avatar-teasers">
-              {kid.level > 1 && <span className="teaser">Lv {kid.level}</span>}
-              {kid.streak > 0 && (
-                <span className="teaser flame">🔥 {kid.streak}</span>
-              )}
-              {kid.allDone ? (
-                <span className="teaser done">All done! 🎉</span>
-              ) : (
-                kid.waiting > 0 && (
-                  <span className="teaser waiting">
-                    {kid.waiting} to do
+            {/* The flex column lives in here rather than on the button
+                itself: a <button> that is its own flex container doesn't
+                grow to include its padding, so the bottom row of teasers
+                was being clipped off the tile on smaller screens. */}
+            <span className="avatar-inner">
+              <span className="avatar-emoji">{kid.avatar_icon}</span>
+              {/* The padlock sits on the name's line, not a row of its own —
+                  it's a note about the name, and giving it its own row cost
+                  a whole line of tile height that the teasers below needed. */}
+              <span className="avatar-name">
+                {kid.name}
+                {kid.has_code && (
+                  <span className="avatar-lock" role="img" aria-label="has a secret code">
+                    🔒
                   </span>
-                )
-              )}
+                )}
+              </span>
+              {/* The pull: what's actually waiting behind this tile. */}
+              <span className="avatar-teasers">
+                {kid.level > 1 && <span className="teaser">Lv {kid.level}</span>}
+                {kid.streak > 0 && (
+                  <span className="teaser flame">🔥 {kid.streak}</span>
+                )}
+                {kid.allDone ? (
+                  <span className="teaser done">All done! 🎉</span>
+                ) : (
+                  kid.waiting > 0 && (
+                    <span className="teaser waiting">
+                      {kid.waiting} to do
+                    </span>
+                  )
+                )}
+              </span>
             </span>
           </button>
         ))}
