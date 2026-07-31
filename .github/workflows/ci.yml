@@ -45,3 +45,47 @@ jobs:
 
       - run: npm run build
         working-directory: client
+
+      # Also build the demo on every PR: it shares the client's source, so a
+      # change that breaks it should fail here rather than on main.
+      - run: npm run build:demo
+        working-directory: client
+
+  demo:
+    name: Publish demo
+    # Only on main. The demo is generated output; regenerating it on every
+    # branch would put a 360 KB diff in the way of every review.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [server, client]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+
+      - run: npm ci
+        working-directory: client
+
+      - run: npm run build:demo
+        working-directory: client
+
+      # The whole reason the old demo went stale was that updating it was a
+      # manual step nobody remembered. Committing it here is what makes
+      # "the demo matches main" true by construction rather than by discipline.
+      - name: Commit the rebuilt demo
+        run: |
+          if git diff --quiet -- docs/index.html; then
+            echo "Demo is already up to date."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/index.html
+          git commit -m "Rebuild the demo for ${GITHUB_SHA::7}"
+          git push

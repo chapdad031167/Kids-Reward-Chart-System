@@ -7,3 +7,4 @@ data/
 *.db-wal
 .DS_Store
 npm-debug.log*
+client/dist-demo/

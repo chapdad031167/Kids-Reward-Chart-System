@@ -9,10 +9,11 @@ ReactDOM.createRoot(document.getElementById('root')).render(
   </React.StrictMode>
 );
 
-// PWA: production builds register the service worker for installability
-// and offline resilience. Fails silently where unsupported (or in the
-// single-file demo, which has no /sw.js to fetch).
-if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+// PWA: production builds register the service worker for installability and
+// offline resilience. Fails silently where unsupported. Skipped in the demo,
+// which ships no /sw.js — and whose absolute path would resolve to the root
+// of the GitHub Pages site rather than to the demo's own directory.
+if (import.meta.env.PROD && !import.meta.env.VITE_DEMO && 'serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js').catch(() => {});
   });

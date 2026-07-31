@@ -2,6 +2,7 @@ import Database from 'better-sqlite3';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { SEED_CATEGORIES } from './seedData.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -140,11 +141,7 @@ if (!kidColumns.includes('secret_code')) {
 // Default categories (also the mapping targets for legacy enum values).
 if (db.prepare(`SELECT COUNT(*) AS n FROM categories`).get().n === 0) {
   const insert = db.prepare(`INSERT INTO categories (label, icon, position) VALUES (?, ?, ?)`);
-  insert.run('Morning', '🌅', 1);
-  insert.run('Evening', '🌙', 2);
-  insert.run('My Space', '🧹', 3);
-  insert.run('Family Jobs', '🏠', 4);
-  insert.run('School & Feelings', '🧠', 5);
+  SEED_CATEGORIES.forEach((c, i) => insert.run(c.label, c.icon, i + 1));
 }
 
 // Legacy tasks table used a CHECK-constrained category string; rebuild it

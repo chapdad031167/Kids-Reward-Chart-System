@@ -6,7 +6,7 @@ world (soccer, dinosaur, space, fantasy, or racing) with its own colors, celebra
 sounds, and vocabulary. Runs entirely on your own hardware; your family's data never
 leaves the house.
 
-**[▶ Try the live demo](https://chapdad031167.github.io/Kids-Reward-Chart-System/)** — a full in-browser build, parent PIN `1234`, add `?reset` to start over.
+**[▶ Try the live demo](https://chapdad031167.github.io/Kids-Reward-Chart-System/)** — the real app running entirely in your browser against fake data. Parent PIN `1234` (any code works); hit **Reset** in the corner to start over.
 
 <p align="center">
   <img src="docs/screenshots/avatar-select.png" width="49%" alt="Avatar select screen with themed kids" />
@@ -116,6 +116,26 @@ cd server && npm install && npm start
 # terminal 2 — Vite dev server on :5173, proxying /api to :8090
 cd client && npm install && npm run dev
 ```
+
+### The live demo
+
+[`docs/index.html`](docs/index.html) is the real client bundle with
+[`client/demo/mock-api.js`](client/demo/mock-api.js) in front of it: a `fetch` override that
+answers `/api/*` out of `localStorage`. No server, no database — the whole thing runs in the
+tab, which is why it can be a static GitHub Pages file.
+
+```bash
+cd client && npm run build:demo   # writes docs/index.html
+```
+
+CI regenerates and commits it on every push to `main`, so it can't drift behind the app the
+way the previous hand-maintained version did. `docs/index.html` is **generated** — edit
+`client/demo/` or `client/src/`, never the output. The starter task and reward library is
+imported from [`server/src/seedData.js`](server/src/seedData.js) rather than copied, so the
+demo shows the same content a real install seeds.
+
+The mock deliberately stubs what has no meaning without a server — backups, ntfy delivery,
+the PIN gate — and says so rather than faking them.
 
 ### Configuration
 
