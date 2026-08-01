@@ -20,7 +20,13 @@ import {
 } from '../service.js';
 
 import { vacationState, setVacation } from '../vacation.js';
-import { listBackups, runBackup, backupFilePath } from '../backup.js';
+import {
+  listBackups,
+  runBackup,
+  backupFilePath,
+  restoreBackup,
+  requestRestart,
+} from '../backup.js';
 import { checkBadges } from '../badges.js';
 import { getFamilyGoal, setFamilyGoal } from '../familyGoal.js';
 import { buildDigest, sendDigest, digestData } from '../digest.js';
@@ -398,6 +404,26 @@ parent.get('/backups/:name/download', (req, res) => {
   const file = backupFilePath(req.params.name);
   if (!file) return res.status(404).json({ error: 'no_such_backup' });
   res.download(file, req.params.name);
+});
+
+/**
+ * Restore a backup over the live database, then restart.
+ *
+ * Backups that can be made but not restored are a comfort blanket rather than
+ * a safety net, and the restore path is the one you find out about at the
+ * worst possible time. The response is sent before the process exits so the
+ * dashboard can tell the family what's happening and wait for the server to
+ * come back up.
+ */
+parent.post('/backups/:name/restore', async (req, res) => {
+  const result = await restoreBackup(req.params.name);
+  if (!result.ok) {
+    return res.status(result.reason === 'unknown_backup' ? 404 : 400).json(result);
+  }
+  // Flush the response first — after this the process is going away, and a
+  // family staring at a failed request has no idea whether it worked.
+  res.on('finish', () => requestRestart());
+  res.json({ ...result, restarting: true });
 });
 
 // ---- Vacation mode ----

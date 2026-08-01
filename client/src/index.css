@@ -2211,6 +2211,33 @@ button {
   min-width: 200px;
 }
 
+/* The button pair must not stretch: .btn.secondary carries flex:1 for
+   full-width stacks elsewhere. */
+.backup-list li > span:last-child {
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+.backup-list .btn {
+  font-size: 13px;
+  padding: 8px 12px;
+  min-height: 40px;
+  flex: 0 0 auto;
+}
+
+/* Marks the copy taken automatically before a destructive action — the one
+   you want if a restore turns out to have been the wrong choice. */
+.backup-tag {
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #fefcbf;
+  color: #744210;
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
 .backup-list .btn {
   flex: 0 0 auto;
   min-height: 40px;
