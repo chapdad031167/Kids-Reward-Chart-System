@@ -56,10 +56,10 @@ const cat = makeCategory();
 function pendingCompletion(kidId, taskId) {
   return db
     .prepare(
-      `INSERT INTO completions (task_id, kid_id, date, status, completed_at)
-       VALUES (?, ?, ?, 'pending', ?)`
+      `INSERT INTO completions (task_id, kid_id, category_id, date, status, completed_at)
+       VALUES (?, ?, (SELECT category_id FROM tasks WHERE id = ?), ?, 'pending', ?)`
     )
-    .run(taskId, kidId, today, iso).lastInsertRowid;
+    .run(taskId, kidId, taskId, today, iso).lastInsertRowid;
 }
 
 // ------------------------------------------------------------------ tokens

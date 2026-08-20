@@ -685,7 +685,10 @@ function PendingTab({ client, notify }) {
         <div key={`c${c.id}`} className="pending-item">
           <span className="who">{c.kid_name}</span>
           <span className="what">
-            {c.is_bonus ? '✨ ' : ''}{c.icon} {c.title} <strong>(+{c.point_value})</strong>
+            {c.is_bonus ? '✨ ' : ''}{c.icon} {c.title}
+            {/* Which slot, for tasks done more than once a day ("Brush teeth · Morning"). */}
+            {c.slot_count > 1 && c.category_label ? ` · ${c.category_label}` : ''}{' '}
+            <strong>(+{c.point_value})</strong>
             {c.date !== todayKey && <span className="day-tag">Yesterday</span>}
             <br />
             <small>{new Date(c.completed_at).toLocaleTimeString()}</small>
@@ -755,6 +758,7 @@ function PendingTab({ client, notify }) {
           <span className="who">{c.kid_name}</span>
           <span className="what">
             {c.icon} {c.title}
+            {c.slot_count > 1 && c.category_label ? ` · ${c.category_label}` : ''}
             {c.date !== todayKey && <span className="day-tag">Yesterday</span>}
             <br />
             <small>rejected {new Date(c.reviewed_at).toLocaleTimeString()}</small>
@@ -819,11 +823,17 @@ function TasksTab({ client, notify }) {
   useEffect(load, [load]);
 
   async function save(form) {
+    const categoryIds = (form.category_ids || []).map(Number);
+    const turnKids = (form.turn_kid_ids || []).map(Number);
     const body = {
       ...form,
       point_value: Number(form.point_value),
-      category_id: Number(form.category_id),
-      kid_id: form.kid_id ? Number(form.kid_id) : null,
+      category_ids: categoryIds,
+      // Primary category too, so anything that only knows the single-category
+      // shape (the demo, older servers) keeps working.
+      category_id: categoryIds[0],
+      turn_kid_ids: turnKids,
+      kid_id: turnKids.length > 0 ? null : form.kid_id ? Number(form.kid_id) : null,
     };
     try {
       if (form.id) await client.patch(`/api/parent/tasks/${form.id}`, body);
@@ -848,7 +858,7 @@ function TasksTab({ client, notify }) {
       <div style={{ display: 'flex', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
         <button
           className="btn primary"
-          onClick={() => setEditing({ title: '', category_id: categories[0]?.id ?? 1, point_value: 1, icon: '⭐', kid_id: null, is_bonus: 0, days: null })}
+          onClick={() => setEditing({ title: '', category_ids: [categories[0]?.id ?? 1], point_value: 1, icon: '⭐', kid_id: null, turn_kid_ids: [], is_bonus: 0, days: null })}
         >
           ➕ Add Task
         </button>
@@ -875,12 +885,31 @@ function TasksTab({ client, notify }) {
                 <td>
                   {t.is_bonus ? '✨ ' : ''}{t.icon} {t.title}
                 </td>
-                <td>{categories.find((c) => c.id === t.category_id)?.label || '—'}</td>
+                <td>
+                  {(t.category_ids ?? [t.category_id])
+                    .map((id) => categories.find((c) => c.id === id)?.label || '—')
+                    .join(', ')}
+                </td>
                 <td>{t.is_bonus ? '✨ Mystery' : scheduleSummary(t.days)}</td>
                 <td>{t.point_value}</td>
-                <td>{t.kid_id ? kids.find((k) => k.id === t.kid_id)?.name || t.kid_id : 'All kids'}</td>
                 <td>
-                  <button className="btn secondary" onClick={() => setEditing({ ...t })}>
+                  {(t.turn_kid_ids ?? []).length > 0
+                    ? `🔄 ${t.turn_kid_ids.map((id) => kids.find((k) => k.id === id)?.name || id).join(' → ')}`
+                    : t.kid_id
+                      ? kids.find((k) => k.id === t.kid_id)?.name || t.kid_id
+                      : 'All kids'}
+                </td>
+                <td>
+                  <button
+                    className="btn secondary"
+                    onClick={() =>
+                      setEditing({
+                        ...t,
+                        category_ids: t.category_ids ?? [t.category_id],
+                        turn_kid_ids: t.turn_kid_ids ?? [],
+                      })
+                    }
+                  >
                     Edit
                   </button>
                 </td>
@@ -986,8 +1015,42 @@ function CategoryManager({ client, notify, onClose }) {
 }
 
 function TaskForm({ task, kids, categories, onSave, onClose }) {
-  const [form, setForm] = useState(task);
+  const [form, setForm] = useState({
+    ...task,
+    category_ids: task.category_ids ?? (task.category_id != null ? [task.category_id] : []),
+    turn_kid_ids: task.turn_kid_ids ?? [],
+  });
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
+
+  const turnMode = form.turn_kid_ids.length > 0;
+
+  function toggleCategory(id) {
+    const has = form.category_ids.includes(id);
+    if (has && form.category_ids.length === 1) return; // always at least one
+    setForm({
+      ...form,
+      category_ids: has ? form.category_ids.filter((c) => c !== id) : [...form.category_ids, id],
+    });
+  }
+
+  function toggleTurnKid(id) {
+    setForm({
+      ...form,
+      turn_kid_ids: form.turn_kid_ids.includes(id)
+        ? form.turn_kid_ids.filter((k) => k !== id)
+        : [...form.turn_kid_ids, id],
+    });
+  }
+
+  // Whoever is picked to start moves to the front; the rest keep their order.
+  function setStarter(id) {
+    setForm({
+      ...form,
+      turn_kid_ids: [id, ...form.turn_kid_ids.filter((k) => k !== id)],
+    });
+  }
+
+  const canSave = !turnMode || form.turn_kid_ids.length >= 2;
 
   return (
     <Modal title={form.id ? 'Edit Task' : 'Add Task'} onClose={onClose}>
@@ -997,14 +1060,20 @@ function TaskForm({ task, kids, categories, onSave, onClose }) {
           <input value={form.title} onChange={set('title')} />
         </label>
         <label>
-          Category
-          <select value={form.category_id} onChange={set('category_id')}>
+          Categories — pick more than one for a task done at different times of day
+          (like brushing teeth in Morning <em>and</em> Evening; each counts separately)
+          <div className="day-chips">
             {categories.map((c) => (
-              <option key={c.id} value={c.id}>
+              <button
+                type="button"
+                key={c.id}
+                className={`day-chip${form.category_ids.includes(c.id) ? ' on' : ''}`}
+                onClick={() => toggleCategory(c.id)}
+              >
                 {c.icon} {c.label}
-              </option>
+              </button>
             ))}
-          </select>
+          </div>
         </label>
         <label>
           Point value (1 = easy, 2 = standard, 3 = big effort)
@@ -1022,20 +1091,74 @@ function TaskForm({ task, kids, categories, onSave, onClose }) {
         )}
         <label>
           Applies to
-          <select value={form.kid_id ?? ''} onChange={(e) => setForm({ ...form, kid_id: e.target.value || null })}>
+          <select
+            value={turnMode ? 'turns' : form.kid_id ?? ''}
+            onChange={(e) => {
+              if (e.target.value === 'turns') {
+                setForm({ ...form, kid_id: null, turn_kid_ids: kids.map((k) => k.id) });
+              } else {
+                setForm({ ...form, kid_id: e.target.value || null, turn_kid_ids: [] });
+              }
+            }}
+          >
             <option value="">All kids</option>
             {kids.map((k) => (
               <option key={k.id} value={k.id}>
                 {k.name} only
               </option>
             ))}
+            {kids.length >= 2 && !form.is_bonus && <option value="turns">🔄 Kids take turns</option>}
           </select>
         </label>
+        {turnMode && (
+          <label>
+            Who shares this chore? Turns follow the task's schedule — with two kids on an
+            every-day chore they alternate days, swapping who covers the weekend each week.
+            <div className="day-chips">
+              {kids.map((k) => (
+                <button
+                  type="button"
+                  key={k.id}
+                  className={`day-chip${form.turn_kid_ids.includes(k.id) ? ' on' : ''}`}
+                  onClick={() => toggleTurnKid(k.id)}
+                >
+                  {k.name}
+                </button>
+              ))}
+            </div>
+            {form.turn_kid_ids.length >= 2 && (
+              <span style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
+                First turn goes to
+                <select
+                  value={form.turn_kid_ids[0]}
+                  onChange={(e) => setStarter(Number(e.target.value))}
+                >
+                  {form.turn_kid_ids.map((id) => (
+                    <option key={id} value={id}>
+                      {kids.find((k) => k.id === id)?.name || id}
+                    </option>
+                  ))}
+                </select>
+              </span>
+            )}
+            {form.turn_kid_ids.length < 2 && (
+              <span style={{ fontSize: 13, color: '#c53030' }}>Pick at least two kids to take turns.</span>
+            )}
+          </label>
+        )}
         <label style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
           <input
             type="checkbox"
             checked={!!form.is_bonus}
-            onChange={(e) => setForm({ ...form, is_bonus: e.target.checked ? 1 : 0 })}
+            onChange={(e) =>
+              setForm({
+                ...form,
+                is_bonus: e.target.checked ? 1 : 0,
+                // Mystery tasks are assigned per kid by the mystery picker —
+                // a turn rotation has no meaning there.
+                turn_kid_ids: e.target.checked ? [] : form.turn_kid_ids,
+              })
+            }
             style={{ width: 22, height: 22 }}
           />
           ✨ Mystery bonus task — hidden from the daily list; appears randomly as the
@@ -1046,7 +1169,7 @@ function TaskForm({ task, kids, categories, onSave, onClose }) {
         <button className="btn secondary" onClick={onClose}>
           Cancel
         </button>
-        <button className="btn primary" onClick={() => onSave(form)}>
+        <button className="btn primary" disabled={!canSave} onClick={() => onSave(form)}>
           Save
         </button>
       </div>

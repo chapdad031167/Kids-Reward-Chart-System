@@ -43,19 +43,21 @@ CREATE TABLE IF NOT EXISTS tasks (
   active INTEGER NOT NULL DEFAULT 1,
   kid_id INTEGER REFERENCES kids(id),
   is_bonus INTEGER NOT NULL DEFAULT 0,
-  days TEXT
+  days TEXT,
+  rotation_anchor TEXT
 );
 
 CREATE TABLE IF NOT EXISTS completions (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   task_id INTEGER NOT NULL REFERENCES tasks(id),
   kid_id INTEGER NOT NULL REFERENCES kids(id),
+  category_id INTEGER NOT NULL REFERENCES categories(id),
   date TEXT NOT NULL,
   status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected', 'expired')),
   completed_at TEXT NOT NULL,
   reviewed_at TEXT,
   client_id TEXT UNIQUE,
-  UNIQUE (task_id, kid_id, date)
+  UNIQUE (task_id, kid_id, date, category_id)
 );
 
 CREATE TABLE IF NOT EXISTS streaks (
@@ -252,6 +254,72 @@ if (!kidCols2.includes('cents_per_point')) {
   db.exec(`ALTER TABLE kids ADD COLUMN cents_per_point INTEGER NOT NULL DEFAULT 0`);
 }
 
+// Multi-category tasks + shared-chore turn-taking (v1.3).
+//
+// task_categories: a task can sit in more than one category ("brush teeth"
+// in both Morning and Evening); each category is its own daily slot on the
+// kid's chart with its own completion. tasks.category_id stays as the
+// primary category so older queries and clients keep working.
+//
+// task_turns: an ordered set of kids who share one chore, taking turns one
+// scheduled day at a time from rotation_anchor. With two kids on an
+// every-day chore that's strict alternation — Sun/Tue/Thu/Sat one week,
+// Mon/Wed/Fri/Sun the next.
+taskColumns = db.prepare(`PRAGMA table_info(tasks)`).all().map((c) => c.name);
+if (!taskColumns.includes('rotation_anchor')) {
+  db.exec(`ALTER TABLE tasks ADD COLUMN rotation_anchor TEXT`);
+}
+
+db.exec(`
+CREATE TABLE IF NOT EXISTS task_categories (
+  task_id INTEGER NOT NULL REFERENCES tasks(id),
+  category_id INTEGER NOT NULL REFERENCES categories(id),
+  PRIMARY KEY (task_id, category_id)
+);
+
+CREATE TABLE IF NOT EXISTS task_turns (
+  task_id INTEGER NOT NULL REFERENCES tasks(id),
+  kid_id INTEGER NOT NULL REFERENCES kids(id),
+  position INTEGER NOT NULL,
+  PRIMARY KEY (task_id, kid_id)
+);
+`);
+
+// Every task belongs to at least its primary category. Idempotent, so it
+// also repairs databases restored from pre-v1.3 backups on the next boot.
+db.exec(`INSERT OR IGNORE INTO task_categories (task_id, category_id) SELECT id, category_id FROM tasks`);
+
+// Completions become per-(task, kid, date, category) so a task that sits in
+// two categories can be done — and rewarded — twice a day. Existing rows get
+// the task's primary category; the UNIQUE constraint has to change, which in
+// SQLite means rebuilding the table.
+const completionColumns = db.prepare(`PRAGMA table_info(completions)`).all().map((c) => c.name);
+if (!completionColumns.includes('category_id')) {
+  db.pragma('foreign_keys = OFF');
+  db.transaction(() => {
+    db.exec(`
+      CREATE TABLE completions_migrated (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        task_id INTEGER NOT NULL REFERENCES tasks(id),
+        kid_id INTEGER NOT NULL REFERENCES kids(id),
+        category_id INTEGER NOT NULL REFERENCES categories(id),
+        date TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected', 'expired')),
+        completed_at TEXT NOT NULL,
+        reviewed_at TEXT,
+        client_id TEXT UNIQUE,
+        UNIQUE (task_id, kid_id, date, category_id)
+      );
+      INSERT INTO completions_migrated (id, task_id, kid_id, category_id, date, status, completed_at, reviewed_at, client_id)
+      SELECT c.id, c.task_id, c.kid_id, t.category_id, c.date, c.status, c.completed_at, c.reviewed_at, c.client_id
+      FROM completions c JOIN tasks t ON t.id = c.task_id;
+      DROP TABLE completions;
+      ALTER TABLE completions_migrated RENAME TO completions;
+    `);
+  })();
+  db.pragma('foreign_keys = ON');
+}
+
 db.exec(`
 CREATE TABLE IF NOT EXISTS streak_freeze_days (
   kid_id INTEGER NOT NULL REFERENCES kids(id),
@@ -267,6 +335,32 @@ CREATE TABLE IF NOT EXISTS break_days (
   label TEXT
 );
 `);
+
+/** The categories a task appears in, primary category first. */
+export function taskCategoryIds(taskId) {
+  const primary = db.prepare(`SELECT category_id FROM tasks WHERE id = ?`).get(taskId)?.category_id;
+  const ids = db
+    .prepare(`SELECT category_id FROM task_categories WHERE task_id = ? ORDER BY category_id`)
+    .all(taskId)
+    .map((r) => r.category_id);
+  if (ids.length === 0) return primary != null ? [primary] : [];
+  return [...ids].sort((a, b) => (a === primary ? -1 : b === primary ? 1 : a - b));
+}
+
+/** Replace a task's category set (also keeps tasks.category_id = the first). */
+export function setTaskCategories(taskId, categoryIds) {
+  db.prepare(`DELETE FROM task_categories WHERE task_id = ?`).run(taskId);
+  const insert = db.prepare(`INSERT INTO task_categories (task_id, category_id) VALUES (?, ?)`);
+  for (const id of categoryIds) insert.run(taskId, id);
+  db.prepare(`UPDATE tasks SET category_id = ? WHERE id = ?`).run(categoryIds[0], taskId);
+}
+
+/** Replace the ordered kid list a shared task rotates through. */
+export function setTaskTurns(taskId, kidIds) {
+  db.prepare(`DELETE FROM task_turns WHERE task_id = ?`).run(taskId);
+  const insert = db.prepare(`INSERT INTO task_turns (task_id, kid_id, position) VALUES (?, ?, ?)`);
+  kidIds.forEach((kidId, i) => insert.run(taskId, kidId, i + 1));
+}
 
 /** Current point balances per bucket for a kid. */
 export function balances(kidId) {

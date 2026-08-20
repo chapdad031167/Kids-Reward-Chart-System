@@ -1,5 +1,7 @@
 import { Router } from 'express';
-import { db, balances } from '../db.js';
+import { db, balances, taskCategoryIds, setTaskCategories, setTaskTurns } from '../db.js';
+import { todayStr } from '../dates.js';
+import { turnKidIds } from '../schedule.js';
 import {
   expireStalePending,
   approveCompletion,
@@ -131,13 +133,18 @@ parent.post('/pin', (req, res) => {
 /** Today's pending completions plus all pending redemptions. */
 parent.get('/pending', (req, res) => {
   expireStalePending();
+  // category_label/slot_count disambiguate multi-category tasks in the queue
+  // ("Brush teeth · Morning" vs "· Evening"); single-category rows don't need it.
   const completions = db
     .prepare(
       `SELECT c.id, c.date, c.completed_at, k.name AS kid_name, k.id AS kid_id,
-              t.title, t.icon, t.point_value, t.is_bonus
+              t.title, t.icon, t.point_value, t.is_bonus,
+              cat.label AS category_label,
+              (SELECT COUNT(*) FROM task_categories tc WHERE tc.task_id = t.id) AS slot_count
        FROM completions c
        JOIN kids k ON k.id = c.kid_id
        JOIN tasks t ON t.id = c.task_id
+       LEFT JOIN categories cat ON cat.id = c.category_id
        WHERE c.status = 'pending' AND c.date >= ?
        ORDER BY c.date, c.completed_at`
     )
@@ -169,10 +176,13 @@ parent.get('/pending', (req, res) => {
   const rejected = db
     .prepare(
       `SELECT c.id, c.date, c.reviewed_at, k.name AS kid_name, k.id AS kid_id,
-              t.title, t.icon, t.point_value
+              t.title, t.icon, t.point_value,
+              cat.label AS category_label,
+              (SELECT COUNT(*) FROM task_categories tc WHERE tc.task_id = t.id) AS slot_count
        FROM completions c
        JOIN kids k ON k.id = c.kid_id
        JOIN tasks t ON t.id = c.task_id
+       LEFT JOIN categories cat ON cat.id = c.category_id
        WHERE c.status = 'rejected' AND c.date >= ?
        ORDER BY c.reviewed_at`
     )
@@ -367,16 +377,17 @@ parent.get('/export/ledger.csv', (req, res) => {
 parent.get('/export/completions.csv', (req, res) => {
   const rows = db
     .prepare(
-      `SELECT c.date, k.name AS kid, t.title, t.point_value, c.status, c.completed_at, c.reviewed_at
+      `SELECT c.date, k.name AS kid, t.title, cat.label AS category, t.point_value, c.status, c.completed_at, c.reviewed_at
        FROM completions c JOIN kids k ON k.id = c.kid_id JOIN tasks t ON t.id = c.task_id
+       LEFT JOIN categories cat ON cat.id = c.category_id
        ORDER BY c.date, c.id`
     )
     .all();
   sendCsv(
     res,
     'reward-chart-completions.csv',
-    ['date', 'kid', 'task', 'points', 'status', 'tapped', 'reviewed'],
-    rows.map((r) => [r.date, r.kid, r.title, r.point_value, r.status, r.completed_at, r.reviewed_at])
+    ['date', 'kid', 'task', 'category', 'points', 'status', 'tapped', 'reviewed'],
+    rows.map((r) => [r.date, r.kid, r.title, r.category, r.point_value, r.status, r.completed_at, r.reviewed_at])
   );
 });
 
@@ -473,16 +484,60 @@ parent.patch('/categories/:id', (req, res) => {
 
 // ---- Task management ----
 
+/** A task row plus its category set and (for shared chores) turn order. */
+function taskWithLists(task) {
+  return { ...task, category_ids: taskCategoryIds(task.id), turn_kid_ids: turnKidIds(task.id) };
+}
+
 parent.get('/tasks', (req, res) => {
-  res.json(db.prepare(`SELECT * FROM tasks ORDER BY active DESC, category_id, id`).all());
+  res.json(db.prepare(`SELECT * FROM tasks ORDER BY active DESC, category_id, id`).all().map(taskWithLists));
 });
 
-function validTaskBody(body) {
+/**
+ * The category set for a body: `category_ids` when sent (deduped, order
+ * kept — the first is the primary), else the legacy single `category_id`.
+ * Returns null when anything is missing or unknown.
+ */
+function resolveCategoryIds(body, fallback = null) {
+  let ids;
+  if (body.category_ids !== undefined) {
+    if (!Array.isArray(body.category_ids)) return null;
+    ids = [...new Set(body.category_ids.map(Number))];
+  } else if (body.category_id !== undefined) {
+    ids = [Number(body.category_id)];
+  } else {
+    ids = fallback;
+  }
+  if (!ids || ids.length === 0) return null;
+  const known = db.prepare(`SELECT id FROM categories WHERE id = ?`);
+  return ids.every((id) => Number.isInteger(id) && known.get(id) !== undefined) ? ids : null;
+}
+
+/**
+ * The turn order for a shared chore: `turn_kid_ids` when sent ([] clears
+ * the rotation), else the stored order. Returns null when a kid is unknown,
+ * duplicated, or the list is a lone kid — a rotation of one is just a
+ * kid-specific task, and the form should say so, not store it obliquely.
+ */
+function resolveTurnKids(body, fallback = []) {
+  if (body.turn_kid_ids === undefined) return fallback;
+  if (!Array.isArray(body.turn_kid_ids)) return null;
+  const ids = body.turn_kid_ids.map(Number);
+  if (ids.length === 1 || new Set(ids).size !== ids.length) return null;
+  const known = db.prepare(`SELECT id FROM kids WHERE id = ?`);
+  return ids.every((id) => Number.isInteger(id) && known.get(id) !== undefined) ? ids : null;
+}
+
+function validTaskBody(body, categoryIds, turnKids) {
   return (
     body &&
     typeof body.title === 'string' &&
     body.title.trim().length > 0 &&
-    db.prepare(`SELECT id FROM categories WHERE id = ?`).get(body.category_id) !== undefined &&
+    categoryIds !== null &&
+    turnKids !== null &&
+    // Mystery bonus tasks are assigned per kid by the mystery picker — a
+    // turn rotation has no meaning there.
+    !(turnKids.length > 0 && body.is_bonus) &&
     Number.isInteger(body.point_value) &&
     body.point_value > 0 &&
     (body.days == null || /^[0-6]{1,7}$/.test(body.days))
@@ -490,23 +545,40 @@ function validTaskBody(body) {
 }
 
 parent.post('/tasks', (req, res) => {
-  if (!validTaskBody(req.body)) return res.status(400).json({ error: 'invalid_task' });
-  const { title, category_id, point_value, icon, kid_id, is_bonus, days } = req.body;
+  const categoryIds = resolveCategoryIds(req.body || {});
+  const turnKids = resolveTurnKids(req.body || {});
+  if (!validTaskBody(req.body, categoryIds, turnKids)) {
+    return res.status(400).json({ error: 'invalid_task' });
+  }
+  const { title, point_value, icon, kid_id, is_bonus, days } = req.body;
   const info = db
     .prepare(
-      `INSERT INTO tasks (title, category_id, point_value, icon, active, kid_id, is_bonus, days)
-       VALUES (?, ?, ?, ?, 1, ?, ?, ?)`
+      `INSERT INTO tasks (title, category_id, point_value, icon, active, kid_id, is_bonus, days, rotation_anchor)
+       VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?)`
     )
-    .run(title.trim(), category_id, point_value, icon || '⭐', kid_id || null, is_bonus ? 1 : 0, days || null);
-  res.status(201).json(db.prepare(`SELECT * FROM tasks WHERE id = ?`).get(info.lastInsertRowid));
+    .run(
+      title.trim(),
+      categoryIds[0],
+      point_value,
+      icon || '⭐',
+      turnKids.length > 0 ? null : kid_id || null,
+      is_bonus ? 1 : 0,
+      days || null,
+      turnKids.length > 0 ? todayStr() : null
+    );
+  setTaskCategories(info.lastInsertRowid, categoryIds);
+  setTaskTurns(info.lastInsertRowid, turnKids);
+  res.status(201).json(taskWithLists(db.prepare(`SELECT * FROM tasks WHERE id = ?`).get(info.lastInsertRowid)));
 });
 
 parent.patch('/tasks/:id', (req, res) => {
   const task = db.prepare(`SELECT * FROM tasks WHERE id = ?`).get(req.params.id);
   if (!task) return res.status(404).json({ error: 'task_not_found' });
+  const categoryIds = resolveCategoryIds(req.body || {}, taskCategoryIds(task.id));
+  const existingTurns = turnKidIds(task.id);
+  const turnKids = resolveTurnKids(req.body || {}, existingTurns);
   const merged = {
     title: req.body.title ?? task.title,
-    category_id: req.body.category_id ?? task.category_id,
     point_value: req.body.point_value ?? task.point_value,
     icon: req.body.icon ?? task.icon,
     active: req.body.active !== undefined ? (req.body.active ? 1 : 0) : task.active,
@@ -514,11 +586,23 @@ parent.patch('/tasks/:id', (req, res) => {
     is_bonus: req.body.is_bonus !== undefined ? (req.body.is_bonus ? 1 : 0) : task.is_bonus,
     days: req.body.days !== undefined ? req.body.days || null : task.days,
   };
-  if (!validTaskBody(merged)) return res.status(400).json({ error: 'invalid_task' });
+  if (!validTaskBody(merged, categoryIds, turnKids)) return res.status(400).json({ error: 'invalid_task' });
+  // A shared chore belongs to its rotation, not to one kid. The anchor only
+  // resets when the turn order actually changes — an unrelated edit must not
+  // silently hand today's turn back to the first kid in the list.
+  if (turnKids.length > 0) merged.kid_id = null;
+  const rotation_anchor =
+    turnKids.length === 0
+      ? null
+      : JSON.stringify(turnKids) === JSON.stringify(existingTurns)
+        ? task.rotation_anchor || todayStr()
+        : todayStr();
   db.prepare(
-    `UPDATE tasks SET title = ?, category_id = ?, point_value = ?, icon = ?, active = ?, kid_id = ?, is_bonus = ?, days = ? WHERE id = ?`
-  ).run(merged.title.trim(), merged.category_id, merged.point_value, merged.icon, merged.active, merged.kid_id, merged.is_bonus, merged.days, task.id);
-  res.json(db.prepare(`SELECT * FROM tasks WHERE id = ?`).get(task.id));
+    `UPDATE tasks SET title = ?, category_id = ?, point_value = ?, icon = ?, active = ?, kid_id = ?, is_bonus = ?, days = ?, rotation_anchor = ? WHERE id = ?`
+  ).run(merged.title.trim(), categoryIds[0], merged.point_value, merged.icon, merged.active, merged.kid_id, merged.is_bonus, merged.days, rotation_anchor, task.id);
+  setTaskCategories(task.id, categoryIds);
+  setTaskTurns(task.id, turnKids);
+  res.json(taskWithLists(db.prepare(`SELECT * FROM tasks WHERE id = ?`).get(task.id)));
 });
 
 // ---- Rewards management ----

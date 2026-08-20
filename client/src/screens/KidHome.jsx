@@ -149,15 +149,18 @@ export default function KidHome() {
 
   async function onTapTask(task) {
     if (task.status) return;
-    // Optimistic: mark pending locally and celebrate right away.
+    // Optimistic: mark pending locally and celebrate right away. Matching on
+    // (id, category_id): a task in two categories is two independent slots.
     setData((d) => ({
       ...d,
-      tasks: d.tasks.map((t) => (t.id === task.id ? { ...t, status: 'pending' } : t)),
+      tasks: d.tasks.map((t) =>
+        t.id === task.id && t.category_id === task.category_id ? { ...t, status: 'pending' } : t
+      ),
       progress: { ...d.progress, doneCount: d.progress.doneCount + 1 },
     }));
     setCelebrating(true);
     try {
-      const result = await tapTask(task.id, Number(kidId));
+      const result = await tapTask(task.id, Number(kidId), task.category_id);
       if (result.queued) {
         setQueuedCount((n) => n + 1);
       }
@@ -405,7 +408,12 @@ export default function KidHome() {
               {cat.label}
             </div>
             {tasks.map((task) => (
-              <TaskCard key={task.id} task={task} theme={theme} onTap={() => onTapTask(task)} />
+              <TaskCard
+                key={`${task.id}:${cat.id}`}
+                task={task}
+                theme={theme}
+                onTap={() => onTapTask(task)}
+              />
             ))}
           </section>
         ))}
@@ -507,6 +515,8 @@ function TaskCard({ task, theme, onTap, bonus = false }) {
                 {theme.icons.streak} {task.streak} day {theme.terms.streak}
               </span>
             )}
+            {/* Shared chores only show on the day it's this kid's turn. */}
+            {task.shared && <span className="streak-chip">🔄 My turn today</span>}
           </div>
         </span>
       </span>

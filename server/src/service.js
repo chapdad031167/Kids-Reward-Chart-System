@@ -33,12 +33,12 @@ export function expireStalePending() {
  * actually expected — vacation days and unscheduled days never count as
  * "missed".
  */
-export function displayStreak(streakRow, taskDays = null) {
+export function displayStreak(streakRow, task = null) {
   if (!streakRow || !streakRow.last_completed_date) return 0;
   const today = todayStr();
   if (
     streakRow.last_completed_date === today ||
-    streakRow.last_completed_date >= prevExpectedDay(taskDays, today, streakRow.kid_id)
+    streakRow.last_completed_date >= prevExpectedDay(task?.days ?? null, today, streakRow.kid_id, task)
   ) {
     return streakRow.current_streak;
   }
@@ -139,7 +139,7 @@ function approveCompletionInner(completionId) {
     // now that yesterday stays approvable. The chain was already advanced by
     // the newer day, so leave it alone rather than counting the day twice.
     current = prevStreak.current_streak;
-  } else if (last >= prevExpectedDay(task.days, completion.date, kid.id)) {
+  } else if (last >= prevExpectedDay(task.days, completion.date, kid.id, task)) {
     // Chain continues across vacation days and unscheduled days.
     current = prevStreak.current_streak + 1;
   } else {
@@ -300,10 +300,12 @@ export const undoLastAction = db.transaction(() => {
  * snapshot approach can't apply.
  */
 export function recomputeStreak(taskId, kidId) {
-  const taskDays = db.prepare(`SELECT days FROM tasks WHERE id = ?`).get(taskId)?.days ?? null;
+  const task = db.prepare(`SELECT * FROM tasks WHERE id = ?`).get(taskId) ?? null;
+  // DISTINCT: a multi-category task can have two approved rows on one date,
+  // and a day only ever counts once toward the chain.
   const rows = db
     .prepare(
-      `SELECT date FROM completions
+      `SELECT DISTINCT date FROM completions
        WHERE task_id = ? AND kid_id = ? AND status = 'approved' ORDER BY date`
     )
     .all(taskId, kidId);
@@ -317,7 +319,7 @@ export function recomputeStreak(taskId, kidId) {
   let longest = 0;
   let prev = null;
   for (const { date } of rows) {
-    chain = prev !== null && prev >= prevExpectedDay(taskDays, date, kidId) ? chain + 1 : 1;
+    chain = prev !== null && prev >= prevExpectedDay(task?.days ?? null, date, kidId, task) ? chain + 1 : 1;
     if (chain > longest) longest = chain;
     prev = date;
   }
@@ -429,8 +431,13 @@ export const deleteKid = db.transaction((kidId) => {
   db.prepare(`DELETE FROM badges WHERE kid_id = ?`).run(kidId);
   db.prepare(`DELETE FROM redemptions WHERE kid_id = ?`).run(kidId);
   db.prepare(`DELETE FROM bonus_assignments WHERE kid_id = ?`).run(kidId);
+  // Drop the kid out of any shared-chore rotations; remaining kids keep
+  // taking turns among themselves (a single leftover kid just owns it).
+  db.prepare(`DELETE FROM task_turns WHERE kid_id = ?`).run(kidId);
   // Kid-specific tasks/rewards: completions/redemptions referencing them
   // belonged only to this kid and are gone above.
+  db.prepare(`DELETE FROM task_categories WHERE task_id IN (SELECT id FROM tasks WHERE kid_id = ?)`).run(kidId);
+  db.prepare(`DELETE FROM task_turns WHERE task_id IN (SELECT id FROM tasks WHERE kid_id = ?)`).run(kidId);
   db.prepare(`DELETE FROM tasks WHERE kid_id = ?`).run(kidId);
   db.prepare(`DELETE FROM rewards_catalog WHERE kid_id = ?`).run(kidId);
   db.prepare(`UPDATE parent_actions SET undone = 1 WHERE undone = 0`).run();

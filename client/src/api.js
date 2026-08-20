@@ -58,8 +58,11 @@ function makeClientId() {
   return `c-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
 }
 
-export async function tapTask(taskId, kidId) {
+export async function tapTask(taskId, kidId, categoryId = null) {
   const body = { task_id: taskId, kid_id: kidId, client_id: makeClientId() };
+  // Which category slot was tapped, for tasks that sit in more than one
+  // category. Omitted (older payloads) means the task's primary category.
+  if (categoryId != null) body.category_id = categoryId;
   try {
     await api.post('/api/completions', body);
     return { ok: true };
