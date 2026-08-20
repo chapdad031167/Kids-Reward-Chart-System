@@ -13,7 +13,7 @@
 import { db } from './db.js';
 import { todayStr, prevDay, nowIso } from './dates.js';
 import { isVacationDay } from './vacation.js';
-import { isScheduledOn } from './schedule.js';
+import { isExpectedFor } from './schedule.js';
 
 /** Is this specific kid's streak protected on this date? */
 export function isFrozenDay(kidId, date) {
@@ -59,14 +59,15 @@ export const applyStreakFreezes = db.transaction(() => {
   for (const kid of kids) {
     if (isFrozenDay(kid.id, day)) continue;
 
-    // Was anything actually expected of them?
+    // Was anything actually expected of them? A shared chore on another
+    // kid's turn doesn't count.
     const scheduled = db
       .prepare(
-        `SELECT days FROM tasks
+        `SELECT id, days, rotation_anchor FROM tasks
          WHERE active = 1 AND is_bonus = 0 AND (kid_id IS NULL OR kid_id = ?)`
       )
       .all(kid.id)
-      .some((t) => isScheduledOn(t.days, day));
+      .some((t) => isExpectedFor(t, kid.id, day));
     if (!scheduled) continue;
 
     // Did they do anything at all? A partial day still counts as showing up.

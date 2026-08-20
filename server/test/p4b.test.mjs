@@ -178,9 +178,9 @@ check(
 
 const showedUp = makeMisser('ShowedUp', 1);
 db.prepare(
-  `INSERT INTO completions (task_id, kid_id, date, status, completed_at)
-   VALUES (?, ?, ?, 'pending', ?)`
-).run(task, showedUp, YESTERDAY, nowIso());
+  `INSERT INTO completions (task_id, kid_id, category_id, date, status, completed_at)
+   VALUES (?, ?, (SELECT category_id FROM tasks WHERE id = ?), ?, 'pending', ?)`
+).run(task, showedUp, task, YESTERDAY, nowIso());
 applyStreakFreezes();
 check(
   'a partial day still counts as showing up — no token spent',
@@ -266,9 +266,9 @@ const nastyTask = db
   )
   .run('Tidy "the" room, properly', cat).lastInsertRowid;
 db.prepare(
-  `INSERT INTO completions (task_id, kid_id, date, status, completed_at)
-   VALUES (?, ?, ?, 'approved', ?)`
-).run(nastyTask, capKid, TODAY, nowIso());
+  `INSERT INTO completions (task_id, kid_id, category_id, date, status, completed_at)
+   VALUES (?, ?, (SELECT category_id FROM tasks WHERE id = ?), ?, 'approved', ?)`
+).run(nastyTask, capKid, nastyTask, TODAY, nowIso());
 
 const ledgerCsv = await asParent('GET', '/api/parent/export/ledger.csv');
 check('the ledger export is served as CSV', /text\/csv/.test(ledgerCsv.headers.get('content-type')));

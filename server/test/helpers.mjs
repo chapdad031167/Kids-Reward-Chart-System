@@ -48,12 +48,14 @@ export function makeCategory(label = 'Chores') {
 }
 
 export function makeTask(categoryId, title = 'T', points = 5) {
-  return db
+  const id = db
     .prepare(
       `INSERT INTO tasks (title, category_id, point_value, days, active)
        VALUES (?, ?, ?, '0,1,2,3,4,5,6', 1)`
     )
     .run(title, categoryId, points).lastInsertRowid;
+  db.prepare(`INSERT INTO task_categories (task_id, category_id) VALUES (?, ?)`).run(id, categoryId);
+  return id;
 }
 
 export function makeReward(title, cost, bucket = 'checking') {

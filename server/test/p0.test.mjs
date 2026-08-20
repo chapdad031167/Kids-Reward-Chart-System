@@ -91,10 +91,10 @@ const taskId = db
 const pend = (kidId, date) =>
   db
     .prepare(
-      `INSERT INTO completions (task_id, kid_id, date, status, completed_at)
-       VALUES (?, ?, ?, 'pending', ?)`
+      `INSERT INTO completions (task_id, kid_id, category_id, date, status, completed_at)
+       VALUES (?, ?, ?, ?, 'pending', ?)`
     )
-    .run(taskId, kidId, date, new Date().toISOString()).lastInsertRowid;
+    .run(taskId, kidId, catId, date, new Date().toISOString()).lastInsertRowid;
 const statusOf = (id) => db.prepare(`SELECT status FROM completions WHERE id = ?`).get(id).status;
 const streakOf = (kidId) => db.prepare(`SELECT * FROM streaks WHERE task_id = ? AND kid_id = ?`).get(taskId, kidId);
 

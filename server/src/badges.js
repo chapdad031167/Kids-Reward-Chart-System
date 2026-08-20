@@ -1,6 +1,6 @@
 import { db, balances } from './db.js';
 import { todayStr, nowIso } from './dates.js';
-import { isScheduledOn } from './schedule.js';
+import { isExpectedFor } from './schedule.js';
 
 /**
  * Badges & levels. Badge definitions live here; earned badges are stored
@@ -46,17 +46,21 @@ function statsFor(kidId) {
     )
     .get(kidId).n;
 
-  // Perfect day = every task scheduled for today is approved (and there was at least one).
+  // Perfect day = every task slot expected of this kid today is approved
+  // (and there was at least one). Multi-category tasks count once per
+  // category; shared chores only count on the kid's own turn.
   const today = todayStr();
   const todayTasks = db
     .prepare(
-      `SELECT t.id, t.days, c.status
+      `SELECT t.id, t.days, t.rotation_anchor, tc.category_id, c.status
        FROM tasks t
+       JOIN task_categories tc ON tc.task_id = t.id
        LEFT JOIN completions c ON c.task_id = t.id AND c.kid_id = ? AND c.date = ?
+         AND c.category_id = tc.category_id
        WHERE t.active = 1 AND t.is_bonus = 0 AND (t.kid_id IS NULL OR t.kid_id = ?)`
     )
     .all(kidId, today, kidId)
-    .filter((t) => isScheduledOn(t.days, today));
+    .filter((t) => isExpectedFor(t, kidId, today));
   const perfectDay = todayTasks.length > 0 && todayTasks.every((t) => t.status === 'approved');
 
   return {

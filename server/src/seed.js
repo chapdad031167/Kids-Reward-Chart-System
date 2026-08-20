@@ -5,6 +5,10 @@ import { SEED_TASKS, SEED_BONUS_TASKS, SEED_REWARDS, CATEGORY_IDS } from './seed
  * Runs on every boot: gives databases created before the mystery-task
  * feature a starter bonus pool. No-op once any bonus task exists.
  */
+const insertTaskCategory = db.prepare(
+  `INSERT OR IGNORE INTO task_categories (task_id, category_id) VALUES (?, ?)`
+);
+
 export function ensureBonusPool() {
   const count = db.prepare(`SELECT COUNT(*) AS n FROM tasks WHERE is_bonus = 1`).get().n;
   if (count > 0) return false;
@@ -13,7 +17,10 @@ export function ensureBonusPool() {
      VALUES (?, ?, ?, ?, 1, NULL, 1)`
   );
   const run = db.transaction(() => {
-    for (const t of SEED_BONUS_TASKS) insert.run(t.title, CATEGORY_IDS[t.category], t.points, t.icon);
+    for (const t of SEED_BONUS_TASKS) {
+      const info = insert.run(t.title, CATEGORY_IDS[t.category], t.points, t.icon);
+      insertTaskCategory.run(info.lastInsertRowid, CATEGORY_IDS[t.category]);
+    }
   });
   run();
   return true;
@@ -32,7 +39,10 @@ export function seedStarterContent() {
         `INSERT INTO tasks (title, category_id, point_value, icon, active, kid_id)
          VALUES (?, ?, ?, ?, 1, NULL)`
       );
-      for (const t of SEED_TASKS) insertTask.run(t.title, CATEGORY_IDS[t.category], t.points, t.icon);
+      for (const t of SEED_TASKS) {
+        const info = insertTask.run(t.title, CATEGORY_IDS[t.category], t.points, t.icon);
+        insertTaskCategory.run(info.lastInsertRowid, CATEGORY_IDS[t.category]);
+      }
     }
     ensureBonusPool();
     if (db.prepare(`SELECT COUNT(*) AS n FROM rewards_catalog`).get().n === 0) {

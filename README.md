@@ -56,6 +56,13 @@ points land → celebrate.*
   Weekdays / Weekends presets), categories, rewards — including an optional **per-day
   cap** so "30 minutes of screen time" can't be cashed in five times before lunch — and
   each child's vault rules: manual saving or automatic split.
+- **Shared chores that take turns**: assign one chore to two or more kids and it
+  rotates one scheduled day at a time — loading the dishwasher alternates Su/Tu/Th/Sa
+  and M/W/F, swapping who covers Sunday each week. Only the kid whose turn it is sees
+  it (with a "my turn today" tag), and streaks skip the other kids' days.
+- **Tasks in more than one category**: brushing teeth can sit in both Morning and
+  Evening — it appears in each section, is tapped, approved, and earns points once per
+  category, and the day counts once toward the streak.
 - Add/remove kids, switch a kid's theme, set secret codes, adjust balances, reset a day,
   bonus awards, a "to deliver" list so approved rewards don't get forgotten, and a
   fresh-start wipe (with an automatic safety backup).

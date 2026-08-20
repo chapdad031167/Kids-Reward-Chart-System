@@ -17,7 +17,7 @@ import { readToken } from '../actionToken.js';
 import { applyStreakFreezes, freezeTokens } from '../streakFreeze.js';
 import { getBonusForToday, revealBonus } from '../bonus.js';
 import { vacationState } from '../vacation.js';
-import { isScheduledOn } from '../schedule.js';
+import { isScheduledOn, isExpectedFor, turnKidIds, turnKidOn } from '../schedule.js';
 import { checkBadges, badgeState, markBadgesSeen, levelFor } from '../badges.js';
 import { getFamilyGoal } from '../familyGoal.js';
 import {
@@ -41,6 +41,16 @@ const DEFAULT_AVATARS = {
 };
 
 export const kiosk = Router();
+
+/** All shared-chore rotations at once: Map(task_id → ordered kid ids). */
+function allTurnKids() {
+  const map = new Map();
+  for (const row of db.prepare(`SELECT task_id, kid_id FROM task_turns ORDER BY task_id, position`).all()) {
+    if (!map.has(row.task_id)) map.set(row.task_id, []);
+    map.get(row.task_id).push(row.kid_id);
+  }
+  return map;
+}
 
 /** Public: does this instance still need first-run setup, and its name. */
 kiosk.get('/setup-status', (req, res) => {
@@ -87,6 +97,7 @@ kiosk.post('/setup', (req, res) => {
 
 kiosk.get('/kids', (req, res) => {
   const today = todayStr();
+  const turnsByTask = allTurnKids();
   const kids = db
     .prepare(`SELECT id, name, avatar_icon, theme, age, secret_code FROM kids ORDER BY id`)
     .all()
@@ -94,21 +105,25 @@ kiosk.get('/kids', (req, res) => {
       // Teaser figures for the avatar screen — it's the app's front door and
       // was its emptiest screen. Cheap per kid, and it turns "pick a name"
       // into "you have 3 waiting and a 5-day streak".
+      // One row per (task, category) slot: a task in two categories is two
+      // check-offs in the day, so it counts as two here too.
       const tasks = db
         .prepare(
-          `SELECT t.id, t.days, c.status
+          `SELECT t.id, t.days, t.rotation_anchor, tc.category_id, c.status
            FROM tasks t
+           JOIN task_categories tc ON tc.task_id = t.id
            LEFT JOIN completions c ON c.task_id = t.id AND c.kid_id = ? AND c.date = ?
+             AND c.category_id = tc.category_id
            WHERE t.active = 1 AND t.is_bonus = 0 AND (t.kid_id IS NULL OR t.kid_id = ?)`
         )
         .all(kid.id, today, kid.id)
-        .filter((t) => isScheduledOn(t.days, today));
+        .filter((t) => isExpectedFor(t, kid.id, today, turnsByTask.get(t.id) ?? []));
 
       const byTask = new Map(
         db.prepare(`SELECT * FROM streaks WHERE kid_id = ?`).all(kid.id).map((s) => [s.task_id, s])
       );
       const bestStreak = tasks.reduce(
-        (best, t) => Math.max(best, displayStreak(byTask.get(t.id), t.days)),
+        (best, t) => Math.max(best, displayStreak(byTask.get(t.id), t)),
         0
       );
 
@@ -140,23 +155,34 @@ kiosk.get('/kids/:id/today', (req, res) => {
   applyStreakFreezes();
   const today = todayStr();
 
+  // One row per (task, category) slot: a task in both Morning and Evening
+  // appears in each section and each appearance is tapped (and earns)
+  // independently. Shared chores only appear for the kid whose turn it is.
+  const turnsByTask = allTurnKids();
   const tasks = db
     .prepare(
-      `SELECT t.id, t.title, t.category_id, t.point_value, t.icon, t.days,
+      `SELECT t.id, t.title, tc.category_id, t.point_value, t.icon, t.days, t.rotation_anchor,
               c.id AS completion_id, c.status
        FROM tasks t
+       JOIN task_categories tc ON tc.task_id = t.id
        LEFT JOIN completions c ON c.task_id = t.id AND c.kid_id = ? AND c.date = ?
+         AND c.category_id = tc.category_id
        WHERE t.active = 1 AND t.is_bonus = 0 AND (t.kid_id IS NULL OR t.kid_id = ?)
-       ORDER BY t.category_id, t.id`
+       ORDER BY tc.category_id, t.id`
     )
     .all(kid.id, today, kid.id)
-    .filter((t) => isScheduledOn(t.days, today));
+    .filter((t) => isExpectedFor(t, kid.id, today, turnsByTask.get(t.id) ?? []));
 
   const categories = db.prepare(`SELECT * FROM categories ORDER BY position, id`).all();
 
   const streakRows = db.prepare(`SELECT * FROM streaks WHERE kid_id = ?`).all(kid.id);
   const streaksByTask = new Map(streakRows.map((s) => [s.task_id, s]));
-  for (const t of tasks) t.streak = displayStreak(streaksByTask.get(t.id), t.days);
+  for (const t of tasks) {
+    t.streak = displayStreak(streaksByTask.get(t.id), t);
+    // Flag shared chores so the kid screen can say "my turn today".
+    if (turnsByTask.has(t.id)) t.shared = true;
+    delete t.rotation_anchor;
+  }
 
   const bonus = getBonusForToday(kid.id);
   checkBadges(kid.id); // lazy catch-up (e.g. saver badge after auto-split)
@@ -245,18 +271,36 @@ kiosk.post('/completions', (req, res) => {
   if (!task.is_bonus && !isScheduledOn(task.days, today)) {
     return res.status(400).json({ error: 'not_scheduled_today' });
   }
+  // Shared chore: only the kid whose turn it is today can tap it.
+  if (!task.is_bonus) {
+    const turns = turnKidIds(task.id);
+    if (turns.length > 0 && turnKidOn(task, today, turns) !== kid.id) {
+      return res.status(400).json({ error: 'not_your_turn_today' });
+    }
+  }
+
+  // Which category slot is being tapped. Older clients (and the offline
+  // queue's stored taps) send none — that means the task's primary category.
+  const categoryId = req.body.category_id == null ? task.category_id : Number(req.body.category_id);
+  const validSlot = db
+    .prepare(`SELECT 1 FROM task_categories WHERE task_id = ? AND category_id = ?`)
+    .get(task.id, categoryId);
+  if (!validSlot && categoryId !== task.category_id) {
+    return res.status(400).json({ error: 'invalid_category' });
+  }
+
   const existing = db
-    .prepare(`SELECT * FROM completions WHERE task_id = ? AND kid_id = ? AND date = ?`)
-    .get(task_id, kid_id, today);
+    .prepare(`SELECT * FROM completions WHERE task_id = ? AND kid_id = ? AND date = ? AND category_id = ?`)
+    .get(task_id, kid_id, today, categoryId);
   if (existing) return res.json({ completion: existing, duplicate: true });
 
   try {
     const info = db
       .prepare(
-        `INSERT INTO completions (task_id, kid_id, date, status, completed_at, client_id)
-         VALUES (?, ?, ?, 'pending', ?, ?)`
+        `INSERT INTO completions (task_id, kid_id, category_id, date, status, completed_at, client_id)
+         VALUES (?, ?, ?, ?, 'pending', ?, ?)`
       )
-      .run(task_id, kid_id, today, nowIso(), client_id || null);
+      .run(task_id, kid_id, categoryId, today, nowIso(), client_id || null);
     const completion = db.prepare(`SELECT * FROM completions WHERE id = ?`).get(info.lastInsertRowid);
     const kidName = db.prepare(`SELECT name FROM kids WHERE id = ?`).get(kid_id).name;
     notifyParent(
